@@ -33,7 +33,7 @@ services:
       GITHUB_MODE: ${GITHUB_MODE:-api}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_OWNER: ${GITHUB_OWNER:-}
-      GITHUB_OWNER_TYPE: ${GITHUB_OWNER_TYPE:-org}
+      GITHUB_OWNER_TYPE: ${GITHUB_OWNER_TYPE:-auto}
       CACHE_TTL: ${CACHE_TTL:-2m}
       FIELD_STATUS: ${FIELD_STATUS:-Status,Estado}
       FIELD_PRIORITY: ${FIELD_PRIORITY:-Priority,Prioridad}
@@ -51,9 +51,10 @@ services:
       STORE: mongo
       LOG_FORMAT: json
       MONGO_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB:-gh_projects_viewer}?authSource=${MONGO_DB:-gh_projects_viewer}
-    # Publicado solo en localhost. En producción, ponga delante un proxy HTTPS (ver README).
+    # Por defecto solo en localhost (detrás de un proxy HTTPS, ver README).
+    # APP_PUBLISH=8080 en .env la expone a la red en el puerto 8080.
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${APP_PUBLISH:-127.0.0.1:8080}:8080"
     networks: [internal]
     read_only: true
     security_opt:

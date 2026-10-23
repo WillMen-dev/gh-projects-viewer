@@ -10,6 +10,8 @@ Aplicación web interna que consulta los proyectos y tareas de **GitHub Projects
 | Integración | API GraphQL de GitHub (ProjectsV2), solo consultas |
 
 > **¿Usas Mac?** Sigue [GUIA_MAC.md](GUIA_MAC.md): instalación, conexión con tu cuenta de GitHub, MongoDB real y pruebas, paso a paso.
+>
+> **¿Vas a instalarla en el servidor de la empresa?** Sigue [INSTALACION_SERVIDOR.md](INSTALACION_SERVIDOR.md).
 
 ## Funcionalidades
 
@@ -88,7 +90,7 @@ Descomprima el zip y abra una terminal en la carpeta `gh-projects-viewer`.
    ```bash
    cp .env.example .env        # Windows: copy .env.example .env
    ```
-   Complete en `.env` al menos: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_OWNER_TYPE` (`user` u `org`) y `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`.
+   Complete en `.env` al menos: `GITHUB_TOKEN`, `GITHUB_OWNER_TYPE` (`auto`, `org` o `user`; ver [Organizaciones](#organizaciones)), `GITHUB_OWNER` si aplica y `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`.
 4. Verifique todo antes de arrancar:
    ```bash
    go run ./cmd/server check
@@ -138,6 +140,20 @@ Descomprima el zip y abra una terminal en la carpeta `gh-projects-viewer`.
 **Proyectos de cuenta personal — Token clásico**: scopes `read:project` y `repo` (este último solo si los repositorios son privados). Para proyectos de usuario se usa el token clásico; el fine-grained se recomienda para organizaciones.
 
 Ideal en la empresa: crear el token con una **cuenta de servicio** dedicada, no con la cuenta personal de un desarrollador.
+
+### Organizaciones
+
+La aplicación muestra los Projects de **una o varias organizaciones**, agrupados por organización. En la pantalla de proyectos hay un filtro por organización, el detalle de cada proyecto indica a qué organización pertenece y el CSV incluye las columnas *Organización* y *Proyecto*.
+
+| `GITHUB_OWNER_TYPE` | Qué proyectos se muestran |
+|---|---|
+| `auto` (recomendado) | Los de **todas las organizaciones a las que pertenece la cuenta del token**, detectadas automáticamente (se revisan cada 5 minutos). Requiere token clásico con `read:org`. `GITHUB_OWNER` es opcional y agrega dueños extra (p. ej. un usuario personal). |
+| `org` / `user` | Solo los de los dueños listados en `GITHUB_OWNER`, separados por coma: `GITHUB_OWNER=empresa-a,empresa-b`. |
+
+- Se ven los Projects que **pertenecen a la organización**, sin importar qué miembro los creó. Los Projects privados solo se ven si la cuenta del token tiene acceso; por eso conviene una cuenta de servicio con lectura sobre toda la organización.
+- Los Projects personales de los miembros (`github.com/users/...`) no pertenecen a la organización y no aparecen.
+- Si una organización falla (por ejemplo exige SSO y el token no está autorizado), se omite y se muestran las demás; `check` indica cuál falló.
+- Todos los usuarios de la aplicación ven todas las organizaciones configuradas.
 
 ### Nombres de campos
 
