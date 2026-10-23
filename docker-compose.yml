@@ -1,0 +1,67 @@
+# Entorno completo: aplicación + MongoDB.
+# Uso: cp .env.example .env  (editar valores)  &&  docker compose up -d --build
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?defina MONGO_ROOT_USER en .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?defina MONGO_ROOT_PASSWORD en .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-gh_projects_viewer}
+      # Usuario de la aplicación con permisos SOLO sobre su base de datos (mínimo privilegio)
+      MONGO_APP_USER: ${MONGO_APP_USER:?defina MONGO_APP_USER en .env}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?defina MONGO_APP_PASSWORD en .env}
+    volumes:
+      - mongo-data:/data/db
+      - ./deploy/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    # MongoDB NO se publica al exterior: solo la aplicación lo alcanza por la red interna.
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # Solo se pasan las variables que la app necesita (no recibe la clave root de Mongo).
+    environment:
+      GITHUB_MODE: ${GITHUB_MODE:-api}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_OWNER: ${GITHUB_OWNER:-}
+      GITHUB_OWNER_TYPE: ${GITHUB_OWNER_TYPE:-org}
+      CACHE_TTL: ${CACHE_TTL:-2m}
+      FIELD_STATUS: ${FIELD_STATUS:-Status,Estado}
+      FIELD_PRIORITY: ${FIELD_PRIORITY:-Priority,Prioridad}
+      FIELD_ESTIMATE: ${FIELD_ESTIMATE:-Estimate,Estimación,Size}
+      FIELD_START_DATE: ${FIELD_START_DATE:-Start date,Fecha de inicio}
+      FIELD_DUE_DATE: ${FIELD_DUE_DATE:-Target date,Due date,Fecha de entrega}
+      DONE_STATUSES: ${DONE_STATUSES:-Done,Hecho,Terminado,Completado}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      SESSION_IDLE_TIMEOUT: ${SESSION_IDLE_TIMEOUT:-30m}
+      SESSION_MAX_LIFETIME: ${SESSION_MAX_LIFETIME:-8h}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      MONGO_DB: ${MONGO_DB:-gh_projects_viewer}
+      STORE: mongo
+      LOG_FORMAT: json
+      MONGO_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB:-gh_projects_viewer}?authSource=${MONGO_DB:-gh_projects_viewer}
+    # Publicado solo en localhost. En producción, ponga delante un proxy HTTPS (ver README).
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks: [internal]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+networks:
+  internal:
+
+volumes:
+  mongo-data:

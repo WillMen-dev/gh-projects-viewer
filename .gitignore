@@ -1,0 +1,14 @@
+# Secretos
+.env
+*.pem
+*.key
+
+# Binarios
+/bin/
+/server
+*.exe
+
+# Editor / SO
+.idea/
+.vscode/
+.DS_Store

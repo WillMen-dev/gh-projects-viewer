@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Consulta de Proyectos</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand small-brand" href="#/">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Consulta de Proyectos</span>
+    </a>
+    <nav id="nav" class="nav" hidden>
+      <a href="#/" data-nav="projects">Proyectos</a>
+      <a href="#/admin" data-nav="admin" id="nav-admin" hidden>Administración</a>
+      <a href="#/password" data-nav="password">Cambiar contraseña</a>
+      <span id="user-label" class="user-label"></span>
+      <button id="logout-btn" class="btn btn-ghost" type="button">Salir</button>
+    </nav>
+  </header>
+  <div id="demo-banner" class="demo-banner" hidden>Modo demostración: los datos mostrados son ficticios.</div>
+  <main id="app" class="container" aria-live="polite">
+    <p class="muted">Cargando…</p>
+  </main>
+  <div id="modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button class="modal-close btn btn-ghost" type="button" data-close aria-label="Cerrar">✕</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
