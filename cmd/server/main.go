@@ -94,7 +94,7 @@ func openStore(ctx context.Context, cfg *config.Config) (store.Store, error) {
 }
 
 func newGitHubClient(cfg *config.Config) *github.Client {
-	return github.NewClient(cfg.GitHubAPIURL, cfg.GitHubToken, cfg.GitHubOwner, cfg.GitHubOwnerType, github.FieldMapping{
+	return github.NewClient(cfg.GitHubAPIURL, cfg.GitHubToken, cfg.GitHubOwners, cfg.GitHubOwnerType == "auto", github.FieldMapping{
 		Status: cfg.FieldStatus, Priority: cfg.FieldPriority, Estimate: cfg.FieldEstimate,
 		StartDate: cfg.FieldStartDate, DueDate: cfg.FieldDueDate,
 	})
@@ -131,7 +131,7 @@ func run() error {
 		slog.Warn("GitHub: MODO DEMO con datos ficticios")
 	} else {
 		provider = newGitHubClient(cfg)
-		slog.Info("GitHub: API GraphQL", "owner", cfg.GitHubOwner, "type", cfg.GitHubOwnerType)
+		slog.Info("GitHub: API GraphQL", "owners", strings.Join(cfg.GitHubOwners, ","), "type", cfg.GitHubOwnerType)
 	}
 	provider = github.NewCachedProvider(provider, cfg.CacheTTL)
 

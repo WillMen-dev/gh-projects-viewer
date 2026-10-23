@@ -11,6 +11,8 @@ type Project struct {
 	Number           int       `json:"number"`
 	Title            string    `json:"title"`
 	ShortDescription string    `json:"shortDescription"`
+	Owner            string    `json:"owner"`               // login de la organización o usuario dueño
+	OwnerName        string    `json:"ownerName,omitempty"` // nombre visible del dueño
 	URL              string    `json:"url"`
 	Closed           bool      `json:"closed"`
 	UpdatedAt        time.Time `json:"updatedAt"`

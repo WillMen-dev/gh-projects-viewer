@@ -57,6 +57,7 @@ type rawProject struct {
 	Project
 	Owner struct {
 		Login string `json:"login"`
+		Name  string `json:"name"`
 	} `json:"owner"`
 	Fields struct {
 		Nodes []*struct {

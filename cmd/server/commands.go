@@ -90,21 +90,39 @@ func check() int {
 				info("Token fine-grained (los permisos se validan al consultar)")
 			}
 
-			projects, err := c.ListProjects(ctx)
+			owners, err := c.Owners(ctx)
+			if err != nil {
+				fail("No se pudieron consultar las organizaciones del token: %v", err)
+				info("En modo auto el token clásico necesita el permiso 'read:org'")
+			} else if len(owners) == 0 {
+				fail("No hay organizaciones ni usuarios que consultar")
+				info("La cuenta del token no pertenece a ninguna organización. Agregue dueños en GITHUB_OWNER")
+			} else if cfg.GitHubOwnerType == "auto" {
+				pass("Organizaciones y usuarios a consultar: %s", strings.Join(owners, ", "))
+			}
+			var projects []github.Project
+			for _, o := range owners {
+				ps, err := c.ListOwnerProjects(ctx, o)
+				switch {
+				case err != nil:
+					fail("No se pudieron listar los proyectos de %q: %v", o, err)
+					if errors.Is(err, github.ErrNotFound) {
+						info("¿Está bien escrito GITHUB_OWNER? ¿El token tiene acceso a esa organización?")
+					}
+					if errors.Is(err, github.ErrPermission) {
+						info("El token necesita lectura de Projects (read:project o 'Projects: Read-only'); si la organización usa SSO, autorice el token")
+					}
+				case len(ps) == 0:
+					warn("%q no tiene proyectos visibles para este token", o)
+				default:
+					pass("%d proyecto(s) encontrados en %s", len(ps), o)
+				}
+				projects = append(projects, ps...)
+			}
 			switch {
-			case err != nil:
-				fail("No se pudieron listar los proyectos de %s %q: %v", cfg.GitHubOwnerType, cfg.GitHubOwner, err)
-				if errors.Is(err, github.ErrNotFound) {
-					info("¿Es correcto GITHUB_OWNER? ¿GITHUB_OWNER_TYPE debe ser 'user' en vez de 'org' (o al revés)?")
-				}
-				if errors.Is(err, github.ErrPermission) {
-					info("El token necesita permiso de lectura de Projects (read:project o 'Projects: Read-only')")
-				}
 			case len(projects) == 0:
-				warn("Conexión correcta, pero %s %q no tiene proyectos visibles para este token", cfg.GitHubOwnerType, cfg.GitHubOwner)
 				info("Cree un proyecto en GitHub (pestaña Projects) o revise los permisos del token")
 			default:
-				pass("%d proyecto(s) encontrados en %s", len(projects), cfg.GitHubOwner)
 				for i, p := range projects {
 					if i >= 3 {
 						info("… y %d más", len(projects)-3)
@@ -115,7 +133,7 @@ func check() int {
 						fail("Proyecto #%d %q: error al leer tareas: %v", p.Number, p.Title, err)
 						continue
 					}
-					pass("Proyecto #%d %q: %d tarea(s)", p.Number, p.Title, len(d.Tasks))
+					pass("Proyecto %s #%d %q: %d tarea(s)", p.Owner, p.Number, p.Title, len(d.Tasks))
 					info("Campos del proyecto: %s", strings.Join(d.FieldNames, ", "))
 					report := func(concept string, aliases []string, get func(github.Task) string) {
 						count := 0

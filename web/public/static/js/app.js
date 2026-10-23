@@ -20,6 +20,7 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const typeLabel = { ISSUE: 'Issue', PULL_REQUEST: 'Pull request', DRAFT_ISSUE: 'Borrador', REDACTED: 'Restringido' };
+  const ownerLabel = (p) => p.ownerName || p.owner || '—';
   const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
   function setView(...nodes) {
@@ -74,35 +75,50 @@
       return;
     }
     const all = data.projects;
+    // Organizaciones (o usuarios) dueñas de los proyectos, en orden alfabético por nombre visible.
+    const owners = [...new Map(all.map((p) => [p.owner, ownerLabel(p)])).entries()]
+      .sort((a, b) => a[1].localeCompare(b[1], 'es'));
     const search = h('input', { type: 'search', placeholder: 'Buscar proyecto…', 'aria-label': 'Buscar proyecto', class: 'input' });
+    const fOwner = h('select', { class: 'input', 'aria-label': 'Organización' },
+      h('option', { value: '*', text: 'Todas las organizaciones' }),
+      ...owners.map(([login, label]) => h('option', { value: login, text: label })));
     const showClosed = h('input', { type: 'checkbox', id: 'show-closed' });
-    const grid = h('div', { class: 'project-grid' });
+    const groups = h('div', {});
+
+    const card = (p) => h('a', { class: 'project-card' + (p.closed ? ' closed' : ''), href: '#/project/' + encodeURIComponent(p.id) },
+      h('div', { class: 'project-card-head' },
+        h('span', { class: 'project-number', text: '#' + p.number }),
+        p.closed ? h('span', { class: 'badge', text: 'Cerrado' }) : null),
+      h('h3', { text: p.title }),
+      h('p', { class: 'muted', text: p.shortDescription || 'Sin descripción' }),
+      h('span', { class: 'small muted', text: 'Actualizado: ' + fmtDateTime(p.updatedAt) }));
 
     function render() {
       const q = search.value.trim().toLowerCase();
       const list = all.filter((p) => (showClosed.checked || !p.closed) &&
+        (fOwner.value === '*' || p.owner === fOwner.value) &&
         (!q || p.title.toLowerCase().includes(q) || (p.shortDescription || '').toLowerCase().includes(q)));
-      grid.replaceChildren(...(list.length ? list.map((p) =>
-        h('a', { class: 'project-card' + (p.closed ? ' closed' : ''), href: '#/project/' + encodeURIComponent(p.id) },
-          h('div', { class: 'project-card-head' },
-            h('span', { class: 'project-number', text: '#' + p.number }),
-            p.closed ? h('span', { class: 'badge', text: 'Cerrado' }) : null),
-          h('h3', { text: p.title }),
-          h('p', { class: 'muted', text: p.shortDescription || 'Sin descripción' }),
-          h('span', { class: 'small muted', text: 'Actualizado: ' + fmtDateTime(p.updatedAt) }))
-      ) : [h('p', { class: 'muted', text: 'No hay proyectos que coincidan.' })]));
+      const sections = owners
+        .map(([login, label]) => [login, label, list.filter((p) => p.owner === login)])
+        .filter(([, , ps]) => ps.length)
+        .map(([login, label, ps]) => h('section', { class: 'owner-group' },
+          h('h2', { class: 'owner-title' }, label, label !== login ? h('span', { class: 'small muted', text: ' @' + login }) : null,
+            h('span', { class: 'badge', text: ps.length + ' proyecto(s)' })),
+          h('div', { class: 'project-grid' }, ...ps.map(card))));
+      groups.replaceChildren(...(sections.length ? sections : [h('p', { class: 'muted', text: 'No hay proyectos que coincidan.' })]));
     }
     search.addEventListener('input', render);
+    fOwner.addEventListener('change', render);
     showClosed.addEventListener('change', render);
     render();
 
     setView(
       h('div', { class: 'page-head' },
         h('div', {}, h('h1', { text: 'Proyectos' }),
-          h('p', { class: 'muted', text: `${all.length} proyecto(s) disponibles en GitHub Projects.` }))),
-      h('div', { class: 'toolbar' }, search,
+          h('p', { class: 'muted', text: `${all.length} proyecto(s) de ${owners.length} organización(es) en GitHub Projects.` }))),
+      h('div', { class: 'toolbar' }, search, owners.length > 1 ? fOwner : null,
         h('label', { class: 'check' }, showClosed, ' Mostrar cerrados')),
-      grid);
+      groups);
   }
 
   // ---------- vista: detalle de proyecto ----------
@@ -241,7 +257,7 @@
     const clearBtn = h('button', { class: 'btn btn-ghost', type: 'button', text: 'Limpiar filtros', onclick: () => {
       fSearch.value = ''; fStatus.value = '*'; fPrio.value = '*'; fAssignee.value = '*'; fOverdue.checked = false; render();
     } });
-    const exportBtn = h('button', { class: 'btn btn-ghost', type: 'button', text: 'Exportar CSV', onclick: () => exportCSV(project.title, filtered()) });
+    const exportBtn = h('button', { class: 'btn btn-ghost', type: 'button', text: 'Exportar CSV', onclick: () => exportCSV(project, filtered()) });
     const refreshBtn = h('button', { class: 'btn', type: 'button', text: 'Actualizar desde GitHub', onclick: async () => {
       refreshBtn.disabled = true;
       try { await API.post('/api/projects/' + encodeURIComponent(id) + '/refresh'); viewProject(id); }
@@ -252,6 +268,7 @@
       h('a', { href: '#/', class: 'back', text: '← Proyectos' }),
       h('div', { class: 'page-head' },
         h('div', {},
+          h('p', { class: 'owner-label', text: 'Organización: ' + ownerLabel(project) }),
           h('h1', { text: project.title }),
           h('p', { class: 'muted' }, project.shortDescription || '', project.shortDescription ? ' · ' : '',
             'Datos consultados: ' + fmtDateTime(data.fetchedAt))),
@@ -328,19 +345,19 @@
 
   // Exporta a CSV las tareas filtradas. Neutraliza "inyección de fórmulas" en Excel/Sheets:
   // celdas que empiezan con = + - @ se prefijan con comilla simple.
-  function exportCSV(title, list) {
+  function exportCSV(project, list) {
     const cell = (v) => {
       let s = String(v == null ? '' : v);
       if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
       return '"' + s.replace(/"/g, '""') + '"';
     };
-    const header = ['Título', 'Descripción', 'Tipo', 'Repositorio', 'Número', 'Estado', 'Prioridad', 'Responsables', 'Estimación', 'Inicio', 'Entrega', 'Etiquetas', 'URL'];
+    const header = ['Organización', 'Proyecto', 'Título', 'Descripción', 'Tipo', 'Repositorio', 'Número', 'Estado', 'Prioridad', 'Responsables', 'Estimación', 'Inicio', 'Entrega', 'Etiquetas', 'URL'];
     const lines = [header.map(cell).join(',')].concat(list.map((t) => [
-      t.title, t.description, typeLabel[t.type] || t.type, t.repository, t.number || '', t.status, t.priority,
+      ownerLabel(project), project.title, t.title, t.description, typeLabel[t.type] || t.type, t.repository, t.number || '', t.status, t.priority,
       t.assignees.map((a) => a.login).join('; '), t.estimate, t.startDate, t.dueDate, t.labels.join('; '), t.url,
     ].map(cell).join(',')));
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const a = h('a', { download: `${slug(title) || 'proyecto'}-${todayISO()}.csv` });
+    const a = h('a', { download: `${slug(project.owner) || 'org'}-${slug(project.title) || 'proyecto'}-${todayISO()}.csv` });
     a.href = URL.createObjectURL(blob);
     document.body.append(a);
     a.click();

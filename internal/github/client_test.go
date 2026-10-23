@@ -20,12 +20,12 @@ var mapping = FieldMapping{
 	DueDate:   []string{"Target date"},
 }
 
-const projectsResp = `{"data":{"organization":{"projectsV2":{"pageInfo":{"hasNextPage":false,"endCursor":null},
+const projectsResp = `{"data":{"repositoryOwner":{"login":"acme","name":"Acme S.A.","projectsV2":{"pageInfo":{"hasNextPage":false,"endCursor":null},
  "nodes":[{"id":"PVT_1","number":1,"title":"Proyecto A","shortDescription":"desc","url":"https://github.com/orgs/acme/projects/1","closed":false,"updatedAt":"2026-10-01T10:00:00Z"}]}}}}`
 
 const itemsResp = `{"data":{"node":{
  "id":"PVT_1","number":1,"title":"Proyecto A","shortDescription":"","url":"u","closed":false,"updatedAt":"2026-10-01T10:00:00Z",
- "owner":{"login":"acme"},
+ "owner":{"login":"acme","name":"Acme S.A."},
  "fields":{"nodes":[{"name":"Status","dataType":"SINGLE_SELECT","options":[{"name":"Todo"},{"name":"Done"}]},
                     {"name":"Priority","dataType":"SINGLE_SELECT","options":[{"name":"P0"},{"name":"P1"}]},
                     {"name":"Title","dataType":"TITLE"}]},
@@ -69,7 +69,7 @@ func newTestServer(t *testing.T, handler func(query string) (int, string)) (*Cli
 		_, _ = w.Write([]byte(resp))
 	}))
 	t.Cleanup(srv.Close)
-	return NewClient(srv.URL, "secret", "acme", "org", mapping), &calls
+	return NewClient(srv.URL, "secret", []string{"acme"}, false, mapping), &calls
 }
 
 func TestListProjects(t *testing.T) {
@@ -78,7 +78,7 @@ func TestListProjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ps) != 1 || ps[0].ID != "PVT_1" || ps[0].Title != "Proyecto A" {
+	if len(ps) != 1 || ps[0].ID != "PVT_1" || ps[0].Title != "Proyecto A" || ps[0].Owner != "acme" || ps[0].OwnerName != "Acme S.A." {
 		t.Fatalf("resultado inesperado: %+v", ps)
 	}
 }
@@ -96,6 +96,9 @@ func TestGetProjectMapsFields(t *testing.T) {
 	if tk.Status != "Todo" || tk.Priority != "P0" || tk.Estimate != "3.5" ||
 		tk.StartDate != "2026-10-01" || tk.DueDate != "2026-10-20" || tk.Iteration != "Sprint 4" {
 		t.Fatalf("mapeo de campos incorrecto: %+v", tk)
+	}
+	if d.Project.Owner != "acme" || d.Project.OwnerName != "Acme S.A." {
+		t.Fatalf("dueño del proyecto incorrecto: %+v", d.Project)
 	}
 	if tk.Description != "Formulario de acceso\ncon validación" {
 		t.Fatalf("descripción incorrecta: %q", tk.Description)
@@ -121,7 +124,7 @@ func TestGetProjectMapsFields(t *testing.T) {
 }
 
 func TestGetProjectRejectsOtherOwner(t *testing.T) {
-	other := strings.Replace(itemsResp, `"login":"acme"`, `"login":"intruso"`, 1)
+	other := strings.Replace(itemsResp, `"login":"acme","name":"Acme S.A."`, `"login":"intruso","name":""`, 1)
 	c, _ := newTestServer(t, func(string) (int, string) { return 200, other })
 	if _, err := c.GetProject(context.Background(), "PVT_1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("esperaba ErrNotFound, obtuvo %v", err)
@@ -223,8 +226,80 @@ func TestAuthAndPermissionErrors(t *testing.T) {
 	if l, err := c.Viewer(context.Background()); err != nil || l != "wmendoza" {
 		t.Fatalf("viewer: %q %v", l, err)
 	}
-	c, _ = newTestServer(t, func(string) (int, string) { return 200, `{"data":{"organization":null}}` })
+	c, _ = newTestServer(t, func(string) (int, string) { return 200, `{"data":{"repositoryOwner":null}}` })
 	if _, err := c.ListProjects(context.Background()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("organización inexistente => ErrNotFound, obtuvo %v", err)
+	}
+}
+
+// Respuestas de un servidor GitHub simulado con dos organizaciones del usuario del token.
+func multiOwnerHandler(query string, vars map[string]any) (int, string) {
+	switch {
+	case strings.Contains(query, "organizations"):
+		return 200, `{"data":{"viewer":{"organizations":{"nodes":[{"login":"acme"},{"login":"globex"},{"login":"sso-org"}]}}}}`
+	case strings.Contains(query, "repositoryOwner"):
+		switch vars["login"] {
+		case "acme":
+			return 200, projectsResp
+		case "globex":
+			return 200, `{"data":{"repositoryOwner":{"login":"globex","name":"Globex","projectsV2":{"pageInfo":{"hasNextPage":false,"endCursor":null},
+ "nodes":[{"id":"PVT_2","number":4,"title":"Proyecto G","shortDescription":"","url":"u","closed":false,"updatedAt":"2026-10-01T10:00:00Z"}]}}}}`
+		default: // organización que exige SSO: no debe tumbar a las demás
+			return 403, `{"message":"Resource protected by organization SAML enforcement."}`
+		}
+	case strings.Contains(query, "node(id"):
+		if vars["id"] == "PVT_2" {
+			return 200, strings.Replace(itemsResp, `"login":"acme","name":"Acme S.A."`, `"login":"globex","name":"Globex"`, 1)
+		}
+		return 200, strings.Replace(itemsResp, `"login":"acme","name":"Acme S.A."`, `"login":"intruso","name":""`, 1)
+	}
+	return 500, `boom`
+}
+
+func newMultiOwnerClient(t *testing.T, owners []string, auto bool) (*Client, *int) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var req gqlRequest
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &req)
+		code, resp := multiOwnerHandler(req.Query, req.Variables)
+		w.WriteHeader(code)
+		_, _ = w.Write([]byte(resp))
+	}))
+	t.Cleanup(srv.Close)
+	return NewClient(srv.URL, "secret", owners, auto, mapping), &calls
+}
+
+func TestAutoDiscoversOrganizations(t *testing.T) {
+	c, calls := newMultiOwnerClient(t, nil, true)
+	ps, err := c.ListProjects(context.Background())
+	if err != nil {
+		t.Fatalf("una organización con SSO no debe impedir listar las demás: %v", err)
+	}
+	if len(ps) != 2 || ps[0].Owner != "acme" || ps[1].Owner != "globex" || ps[1].OwnerName != "Globex" {
+		t.Fatalf("proyectos inesperados: %+v", ps)
+	}
+	before := *calls
+	if _, err := c.GetProject(context.Background(), "PVT_2"); err != nil {
+		t.Fatalf("proyecto de una organización descubierta: %v", err)
+	}
+	if *calls != before+1 {
+		t.Fatalf("las organizaciones deben reutilizarse desde la caché, hubo %d llamadas", *calls-before)
+	}
+	if _, err := c.GetProject(context.Background(), "PVT_otro"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("un proyecto de un dueño ajeno debe rechazarse, obtuvo %v", err)
+	}
+}
+
+func TestExplicitOwnersList(t *testing.T) {
+	c, _ := newMultiOwnerClient(t, []string{"acme", "globex"}, false)
+	ps, err := c.ListProjects(context.Background())
+	if err != nil || len(ps) != 2 {
+		t.Fatalf("lista de dueños: %+v %v", ps, err)
+	}
+	c, _ = newMultiOwnerClient(t, []string{"sso-org"}, false)
+	if _, err := c.ListProjects(context.Background()); !errors.Is(err, ErrPermission) {
+		t.Fatalf("si ningún dueño responde debe devolverse el error, obtuvo %v", err)
 	}
 }

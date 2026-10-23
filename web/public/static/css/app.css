@@ -136,6 +136,9 @@ a { color: var(--accent); }
 .prio-p2, .prio-baja, .prio-low { background: var(--accent-soft); color: var(--accent); }
 
 /* ---------- lista de proyectos ---------- */
+.owner-group { margin-bottom: 1.8rem; }
+.owner-title { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; font-size: 1.1rem; margin: 0 0 .75rem; }
+.owner-label { margin: 0 0 .2rem; font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 .project-card {
   display: flex; flex-direction: column; gap: .35rem; padding: 1.1rem 1.2rem; text-decoration: none; color: inherit;

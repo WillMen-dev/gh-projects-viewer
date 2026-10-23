@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +18,8 @@ type Config struct {
 	// GitHub
 	GitHubMode      string // "api" (real) o "demo" (datos de ejemplo)
 	GitHubToken     string
-	GitHubOwner     string // organización o usuario dueño de los proyectos
-	GitHubOwnerType string // "org" o "user"
+	GitHubOwners    []string // organizaciones o usuarios dueños de los proyectos
+	GitHubOwnerType string   // "org", "user" o "auto" (organizaciones del usuario del token)
 	GitHubAPIURL    string
 	CacheTTL        time.Duration
 
@@ -45,6 +46,9 @@ type Config struct {
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
 }
+
+// ownerRe valida nombres de usuario u organización de GitHub.
+var ownerRe = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
 
 func env(key, def string) string {
 	if v, ok := os.LookupEnv(key); ok && strings.TrimSpace(v) != "" {
@@ -88,7 +92,7 @@ func Load() (*Config, error) {
 		Addr:            env("APP_ADDR", ":8080"),
 		GitHubMode:      strings.ToLower(env("GITHUB_MODE", "api")),
 		GitHubToken:     os.Getenv("GITHUB_TOKEN"),
-		GitHubOwner:     env("GITHUB_OWNER", ""),
+		GitHubOwners:    list("GITHUB_OWNER", ""),
 		GitHubOwnerType: strings.ToLower(env("GITHUB_OWNER_TYPE", "org")),
 		GitHubAPIURL:    env("GITHUB_API_URL", "https://api.github.com/graphql"),
 
@@ -129,11 +133,16 @@ func Load() (*Config, error) {
 		if c.GitHubToken == "" {
 			return nil, errors.New("GITHUB_TOKEN es obligatorio cuando GITHUB_MODE=api")
 		}
-		if c.GitHubOwner == "" {
-			return nil, errors.New("GITHUB_OWNER es obligatorio cuando GITHUB_MODE=api")
+		if c.GitHubOwnerType != "org" && c.GitHubOwnerType != "user" && c.GitHubOwnerType != "auto" {
+			return nil, errors.New("GITHUB_OWNER_TYPE debe ser 'org', 'user' o 'auto'")
 		}
-		if c.GitHubOwnerType != "org" && c.GitHubOwnerType != "user" {
-			return nil, errors.New("GITHUB_OWNER_TYPE debe ser 'org' o 'user'")
+		if len(c.GitHubOwners) == 0 && c.GitHubOwnerType != "auto" {
+			return nil, errors.New("GITHUB_OWNER es obligatorio cuando GITHUB_MODE=api (o use GITHUB_OWNER_TYPE=auto)")
+		}
+		for _, o := range c.GitHubOwners {
+			if !ownerRe.MatchString(o) {
+				return nil, fmt.Errorf("GITHUB_OWNER contiene un nombre inválido: %q", o)
+			}
 		}
 		if !strings.HasPrefix(c.GitHubAPIURL, "https://") {
 			return nil, errors.New("GITHUB_API_URL debe usar https")

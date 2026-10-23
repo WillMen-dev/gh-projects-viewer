@@ -16,7 +16,8 @@ import (
 
 // Límites defensivos para no descargar volúmenes desproporcionados.
 const (
-	maxProjects      = 100
+	maxProjects      = 100 // por dueño
+	ownersTTL        = 5 * time.Minute
 	maxItems         = 2000
 	itemsPageSize    = 100
 	maxResponseBytes = 20 << 20 // 20 MB
@@ -33,25 +34,29 @@ var (
 // Client consulta la API GraphQL de GitHub en modo SOLO LECTURA.
 // Solo ejecuta las consultas definidas en este archivo (no hay mutaciones).
 type Client struct {
-	apiURL    string
-	token     string
-	owner     string
-	ownerType string // org | user
-	mapping   FieldMapping
-	http      *http.Client
+	apiURL  string
+	token   string
+	owners  []string // dueños configurados (organizaciones o usuarios)
+	auto    bool     // además, descubrir las organizaciones del usuario del token
+	mapping FieldMapping
+	http    *http.Client
 
-	mu         sync.Mutex
-	lastScopes string
+	mu            sync.Mutex
+	lastScopes    string
+	autoOwners    []string
+	autoOwnersExp time.Time
 }
 
-func NewClient(apiURL, token, owner, ownerType string, mapping FieldMapping) *Client {
+// NewClient crea el cliente. Con auto=true se agregan a owners las organizaciones
+// a las que pertenece la cuenta dueña del token.
+func NewClient(apiURL, token string, owners []string, auto bool, mapping FieldMapping) *Client {
 	return &Client{
-		apiURL:    apiURL,
-		token:     token,
-		owner:     owner,
-		ownerType: ownerType,
-		mapping:   mapping,
-		http:      &http.Client{Timeout: 30 * time.Second},
+		apiURL:  apiURL,
+		token:   token,
+		owners:  owners,
+		auto:    auto,
+		mapping: mapping,
+		http:    &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -170,52 +175,133 @@ func (c *Client) Viewer(ctx context.Context) (string, error) {
 	return data.Viewer.Login, nil
 }
 
-const projectsQueryTmpl = `query($login: String!, $cursor: String) {
-  %s(login: $login) {
-    projectsV2(first: 50, after: $cursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      pageInfo { hasNextPage endCursor }
-      nodes { id number title shortDescription url closed updatedAt }
+// Owners devuelve los dueños (organizaciones o usuarios) cuyos proyectos se muestran.
+// En modo automático incluye las organizaciones de la cuenta del token (se guardan unos minutos).
+func (c *Client) Owners(ctx context.Context) ([]string, error) {
+	if !c.auto {
+		return c.owners, nil
+	}
+	c.mu.Lock()
+	if c.autoOwners != nil && time.Now().Before(c.autoOwnersExp) {
+		v := c.autoOwners
+		c.mu.Unlock()
+		return v, nil
+	}
+	c.mu.Unlock()
+
+	var data struct {
+		Viewer struct {
+			Organizations struct {
+				Nodes []*struct {
+					Login string `json:"login"`
+				} `json:"nodes"`
+			} `json:"organizations"`
+		} `json:"viewer"`
+	}
+	if err := c.do(ctx, `query { viewer { organizations(first: 100) { nodes { login } } } }`, map[string]any{}, &data); err != nil {
+		return nil, err
+	}
+	owners := append([]string{}, c.owners...)
+	for _, o := range data.Viewer.Organizations.Nodes {
+		if o != nil && o.Login != "" && !containsFold(owners, o.Login) {
+			owners = append(owners, o.Login)
+		}
+	}
+	c.mu.Lock()
+	c.autoOwners, c.autoOwnersExp = owners, time.Now().Add(ownersTTL)
+	c.mu.Unlock()
+	return owners, nil
+}
+
+func containsFold(list []string, s string) bool {
+	for _, v := range list {
+		if strings.EqualFold(v, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// repositoryOwner resuelve tanto organizaciones como usuarios, así no hace falta indicar el tipo.
+const projectsQuery = `query($login: String!, $cursor: String) {
+  repositoryOwner(login: $login) {
+    login
+    ... on Organization { name }
+    ... on User { name }
+    ... on ProjectV2Owner {
+      projectsV2(first: 50, after: $cursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id number title shortDescription url closed updatedAt }
+      }
     }
   }
 }`
 
-// ListProjects devuelve los proyectos del dueño configurado.
+// ListProjects devuelve los proyectos de todos los dueños configurados.
+// Si un dueño falla (p. ej. la organización exige SSO) se omite y se continúa con los demás;
+// solo se devuelve error si ninguno respondió.
 func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
-	root := "organization"
-	if c.ownerType == "user" {
-		root = "user"
+	owners, err := c.Owners(ctx)
+	if err != nil {
+		return nil, err
 	}
-	query := fmt.Sprintf(projectsQueryTmpl, root)
+	all := []Project{}
+	var firstErr error
+	answered := 0
+	for _, o := range owners {
+		ps, err := c.ListOwnerProjects(ctx, o)
+		if err != nil {
+			slog.Warn("github: no se pudieron listar los proyectos de un dueño", "owner", o, "err", err)
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		answered++
+		all = append(all, ps...)
+	}
+	if answered == 0 && firstErr != nil {
+		return nil, firstErr
+	}
+	return all, nil
+}
 
+// ListOwnerProjects devuelve los proyectos de una organización o usuario.
+func (c *Client) ListOwnerProjects(ctx context.Context, owner string) ([]Project, error) {
 	var all []Project
 	var cursor *string
 	for len(all) < maxProjects {
-		var data map[string]*struct {
-			ProjectsV2 struct {
-				PageInfo struct {
-					HasNextPage bool   `json:"hasNextPage"`
-					EndCursor   string `json:"endCursor"`
-				} `json:"pageInfo"`
-				Nodes []*Project `json:"nodes"`
-			} `json:"projectsV2"`
+		var data struct {
+			RepositoryOwner *struct {
+				Login      string `json:"login"`
+				Name       string `json:"name"`
+				ProjectsV2 struct {
+					PageInfo struct {
+						HasNextPage bool   `json:"hasNextPage"`
+						EndCursor   string `json:"endCursor"`
+					} `json:"pageInfo"`
+					Nodes []*Project `json:"nodes"`
+				} `json:"projectsV2"`
+			} `json:"repositoryOwner"`
 		}
-		vars := map[string]any{"login": c.owner, "cursor": cursor}
-		if err := c.do(ctx, query, vars, &data); err != nil {
+		vars := map[string]any{"login": owner, "cursor": cursor}
+		if err := c.do(ctx, projectsQuery, vars, &data); err != nil {
 			return nil, err
 		}
-		ownerData := data[root]
-		if ownerData == nil {
-			return nil, fmt.Errorf("%w: %s %q no existe o el token no tiene acceso", ErrNotFound, root, c.owner)
+		ro := data.RepositoryOwner
+		if ro == nil {
+			return nil, fmt.Errorf("%w: %q no existe o el token no tiene acceso", ErrNotFound, owner)
 		}
-		for _, p := range ownerData.ProjectsV2.Nodes {
+		for _, p := range ro.ProjectsV2.Nodes {
 			if p != nil {
+				p.Owner, p.OwnerName = ro.Login, ro.Name
 				all = append(all, *p)
 			}
 		}
-		if !ownerData.ProjectsV2.PageInfo.HasNextPage {
+		if !ro.ProjectsV2.PageInfo.HasNextPage {
 			break
 		}
-		next := ownerData.ProjectsV2.PageInfo.EndCursor
+		next := ro.ProjectsV2.PageInfo.EndCursor
 		cursor = &next
 	}
 	return all, nil
@@ -225,7 +311,7 @@ const projectItemsQuery = `query($id: ID!, $cursor: String) {
   node(id: $id) {
     ... on ProjectV2 {
       id number title shortDescription url closed updatedAt
-      owner { ... on Organization { login } ... on User { login } }
+      owner { ... on Organization { login name } ... on User { login name } }
       fields(first: 50) {
         nodes {
           ... on ProjectV2FieldCommon { name dataType }
@@ -273,8 +359,12 @@ const projectItemsQuery = `query($id: ID!, $cursor: String) {
 // PullRequest.state (PullRequestState) son tipos distintos y GraphQL no permite fusionarlos.
 
 // GetProject obtiene un proyecto con todas sus tareas (paginando).
-// Verifica que el proyecto pertenezca al dueño configurado.
+// Verifica que el proyecto pertenezca a uno de los dueños configurados.
 func (c *Client) GetProject(ctx context.Context, projectID string) (*ProjectDetail, error) {
+	owners, err := c.Owners(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var detail *ProjectDetail
 	var cursor *string
 	for {
@@ -288,12 +378,13 @@ func (c *Client) GetProject(ctx context.Context, projectID string) (*ProjectDeta
 		if data.Node == nil || data.Node.ID == "" {
 			return nil, ErrNotFound
 		}
-		if !strings.EqualFold(data.Node.Owner.Login, c.owner) {
+		if !containsFold(owners, data.Node.Owner.Login) {
 			// Defensa en profundidad: nunca mostrar proyectos de otros dueños.
 			return nil, ErrNotFound
 		}
 		if detail == nil {
 			detail = mapProjectHeader(data.Node, c.mapping)
+			detail.Project.Owner, detail.Project.OwnerName = data.Node.Owner.Login, data.Node.Owner.Name
 		}
 		for _, it := range data.Node.Items.Nodes {
 			if it != nil {

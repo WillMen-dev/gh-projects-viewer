@@ -34,10 +34,10 @@ func NewDemoProvider() *DemoProvider {
 		labels                   []string
 	}
 	dpv := &DemoProvider{details: map[string]*ProjectDetail{}}
-	mk := func(id string, num int, title, desc string, seeds []seed) {
+	mk := func(owner, ownerName, id string, num int, title, desc string, seeds []seed) {
 		p := Project{
-			ID: id, Number: num, Title: title, ShortDescription: desc,
-			URL: fmt.Sprintf("https://github.com/orgs/demo-org/projects/%d", num), UpdatedAt: now.Add(-time.Duration(num) * time.Hour),
+			ID: id, Number: num, Title: title, ShortDescription: desc, Owner: owner, OwnerName: ownerName,
+			URL: fmt.Sprintf("https://github.com/orgs/%s/projects/%d", owner, num), UpdatedAt: now.Add(-time.Duration(num) * time.Hour),
 		}
 		d := &ProjectDetail{Project: p, StatusOptions: statuses, PriorityOption: priorities, FetchedAt: now, Tasks: []Task{}}
 		for i, s := range seeds {
@@ -81,7 +81,7 @@ func NewDemoProvider() *DemoProvider {
 		dpv.details[id] = d
 	}
 
-	mk("PVT_demo_portal", 1, "Portal de clientes", "Nueva versión del portal web de clientes", []seed{
+	mk("empresa-demo", "Empresa Demo S.A.S.", "PVT_demo_portal", 1, "Portal de clientes", "Nueva versión del portal web de clientes", []seed{
 		{"Diseñar pantalla de inicio de sesión", "Done", "P1", "3", []string{"laura"}, -20, -12, "ISSUE", []string{"frontend"}},
 		{"API de autenticación", "Done", "P0", "5", []string{"carlos"}, -18, -10, "ISSUE", []string{"backend"}},
 		{"Integrar pasarela de pagos", "In Progress", "P0", "8", []string{"carlos", "ana"}, -6, 4, "ISSUE", []string{"backend", "pagos"}},
@@ -91,14 +91,14 @@ func NewDemoProvider() *DemoProvider {
 		{"Corregir error de sesión expirada", "In Review", "P0", "1", []string{"ana"}, -2, 1, "PULL_REQUEST", []string{"bug"}},
 		{"Documentar endpoints públicos", "Todo", "P2", "2", []string{"carlos"}, 0, 0, "ISSUE", []string{"docs"}},
 	})
-	mk("PVT_demo_rrhh", 2, "Sistema interno RRHH", "Gestión de solicitudes internas", []seed{
+	mk("filial-demo", "Filial Demo", "PVT_demo_rrhh", 2, "Sistema interno RRHH", "Gestión de solicitudes internas", []seed{
 		{"Formulario de solicitud de vacaciones", "Done", "P1", "3", []string{"laura"}, -30, -22, "ISSUE", []string{"frontend"}},
 		{"Flujo de aprobación por jefe inmediato", "In Progress", "P0", "8", []string{"ana"}, -10, -3, "ISSUE", []string{"backend"}},
 		{"Reporte mensual de ausencias", "Todo", "P1", "5", []string{"carlos"}, 2, 14, "ISSUE", []string{"reportes"}},
 		{"Notificaciones por correo", "Todo", "P2", "3", nil, 0, 0, "DRAFT_ISSUE", nil},
 		{"Pruebas de regresión", "In Review", "P1", "2", []string{"pedro"}, -1, 2, "ISSUE", []string{"qa"}},
 	})
-	mk("PVT_demo_infra", 3, "Infraestructura 2026", "Migración de servidores y monitoreo", []seed{
+	mk("empresa-demo", "Empresa Demo S.A.S.", "PVT_demo_infra", 3, "Infraestructura 2026", "Migración de servidores y monitoreo", []seed{
 		{"Inventario de servidores actuales", "Done", "P1", "2", []string{"pedro"}, -40, -35, "ISSUE", []string{"infra"}},
 		{"Configurar monitoreo centralizado", "In Progress", "P1", "5", []string{"ana"}, -5, 6, "ISSUE", []string{"infra"}},
 		{"Plan de respaldo y recuperación", "Todo", "P0", "5", []string{"carlos"}, 1, 9, "ISSUE", []string{"infra", "seguridad"}},
