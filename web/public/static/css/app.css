@@ -221,6 +221,7 @@ a { color: var(--accent); }
 .modal-dialog { position: relative; background: var(--surface); border-radius: 14px; padding: 1.5rem 1.6rem; width: min(640px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
 .modal-dialog h2 { margin: 0 2.5rem 1rem 0; font-size: 1.25rem; }
 .modal-close { position: absolute; top: .8rem; right: .8rem; }
+.description { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow-y: auto; margin: 0 0 1.2rem; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 8px; }
 .detail { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1.2rem; margin: 0 0 1.2rem; }
 .detail dt { color: var(--muted); font-size: .88rem; }
 .detail dd { margin: 0; }

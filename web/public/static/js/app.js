@@ -154,7 +154,7 @@
         }
         if (fOverdue.checked && !isOverdue(t)) return false;
         if (q) {
-          const hay = [t.title, t.number ? '#' + t.number : '', t.repository, ...t.labels, ...t.assignees.map((a) => a.login + ' ' + (a.name || ''))].join(' ').toLowerCase();
+          const hay = [t.title, t.description, t.number ? '#' + t.number : '', t.repository, ...t.labels, ...t.assignees.map((a) => a.login + ' ' + (a.name || ''))].join(' ').toLowerCase();
           if (!hay.includes(q)) return false;
         }
         return true;
@@ -319,6 +319,7 @@
     const extra = Object.entries(t.fields || {}).filter(([k, v]) => v && !known.has(k) && !rows.some((r) => r[1] === v));
     return h('div', {},
       h('h2', { id: 'modal-title', text: t.title }),
+      h('div', { class: 'description', text: t.description || 'Sin descripción' }),
       h('dl', { class: 'detail' }, ...[...rows, ...extra].flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: v })]),
         h('dt', { text: 'Responsables' }), h('dd', {}, t.assignees.length ? t.assignees.map((a) => a.name ? `${a.name} (@${a.login})` : '@' + a.login).join(', ') : 'Sin responsable'),
         h('dt', { text: 'Etiquetas' }), h('dd', {}, t.labels.length ? h('div', { class: 'chips' }, ...t.labels.map((l) => h('span', { class: 'chip', text: l }))) : '—')),
@@ -333,9 +334,9 @@
       if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
       return '"' + s.replace(/"/g, '""') + '"';
     };
-    const header = ['Título', 'Tipo', 'Repositorio', 'Número', 'Estado', 'Prioridad', 'Responsables', 'Estimación', 'Inicio', 'Entrega', 'Etiquetas', 'URL'];
+    const header = ['Título', 'Descripción', 'Tipo', 'Repositorio', 'Número', 'Estado', 'Prioridad', 'Responsables', 'Estimación', 'Inicio', 'Entrega', 'Etiquetas', 'URL'];
     const lines = [header.map(cell).join(',')].concat(list.map((t) => [
-      t.title, typeLabel[t.type] || t.type, t.repository, t.number || '', t.status, t.priority,
+      t.title, t.description, typeLabel[t.type] || t.type, t.repository, t.number || '', t.status, t.priority,
       t.assignees.map((a) => a.login).join('; '), t.estimate, t.startDate, t.dueDate, t.labels.join('; '), t.url,
     ].map(cell).join(',')));
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });

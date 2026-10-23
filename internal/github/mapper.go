@@ -20,6 +20,7 @@ type rawLabels struct {
 
 type rawContent struct {
 	Title      string `json:"title"`
+	Body       string `json:"body"`
 	Number     int    `json:"number"`
 	URL        string `json:"url"`
 	IssueState string `json:"issueState"`
@@ -122,6 +123,7 @@ func mapItem(it *rawItem, m FieldMapping) Task {
 	}
 	if c := it.Content; c != nil {
 		t.Title = c.Title
+		t.Description = c.Body
 		t.Number = c.Number
 		t.URL = c.URL
 		t.State = c.IssueState

@@ -25,23 +25,24 @@ type Person struct {
 
 // Task es una tarea (item) del proyecto, normalizada para la interfaz.
 type Task struct {
-	ID         string            `json:"id"`
-	Type       string            `json:"type"` // ISSUE, PULL_REQUEST, DRAFT_ISSUE, REDACTED
-	Title      string            `json:"title"`
-	Number     int               `json:"number,omitempty"`
-	URL        string            `json:"url,omitempty"`
-	Repository string            `json:"repository,omitempty"`
-	State      string            `json:"state,omitempty"` // OPEN, CLOSED, MERGED
-	Assignees  []Person          `json:"assignees"`
-	Labels     []string          `json:"labels"`
-	Status     string            `json:"status"`
-	Priority   string            `json:"priority"`
-	Estimate   string            `json:"estimate"`
-	StartDate  string            `json:"startDate"` // YYYY-MM-DD o vacío
-	DueDate    string            `json:"dueDate"`   // YYYY-MM-DD o vacío
-	Iteration  string            `json:"iteration,omitempty"`
-	Fields     map[string]string `json:"fields"` // todos los campos personalizados
-	UpdatedAt  time.Time         `json:"updatedAt"`
+	ID          string            `json:"id"`
+	Type        string            `json:"type"` // ISSUE, PULL_REQUEST, DRAFT_ISSUE, REDACTED
+	Title       string            `json:"title"`
+	Description string            `json:"description"` // cuerpo del issue/PR/borrador (Markdown)
+	Number      int               `json:"number,omitempty"`
+	URL         string            `json:"url,omitempty"`
+	Repository  string            `json:"repository,omitempty"`
+	State       string            `json:"state,omitempty"` // OPEN, CLOSED, MERGED
+	Assignees   []Person          `json:"assignees"`
+	Labels      []string          `json:"labels"`
+	Status      string            `json:"status"`
+	Priority    string            `json:"priority"`
+	Estimate    string            `json:"estimate"`
+	StartDate   string            `json:"startDate"` // YYYY-MM-DD o vacío
+	DueDate     string            `json:"dueDate"`   // YYYY-MM-DD o vacío
+	Iteration   string            `json:"iteration,omitempty"`
+	Fields      map[string]string `json:"fields"` // todos los campos personalizados
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 // ProjectDetail agrupa el proyecto, sus tareas y las opciones de los campos.

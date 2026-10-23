@@ -43,7 +43,8 @@ func NewDemoProvider() *DemoProvider {
 		for i, s := range seeds {
 			t := Task{
 				ID: fmt.Sprintf("%s_item_%d", id, i+1), Type: s.typ, Title: s.title, Number: 100 + i,
-				URL: fmt.Sprintf("https://github.com/demo-org/repo-%d/issues/%d", num, 100+i), Repository: fmt.Sprintf("demo-org/repo-%d", num),
+				Description: "Descripción de demostración para: " + s.title + ".\n\nCriterios de aceptación:\n- Revisado por el responsable\n- Documentado",
+				URL:         fmt.Sprintf("https://github.com/demo-org/repo-%d/issues/%d", num, 100+i), Repository: fmt.Sprintf("demo-org/repo-%d", num),
 				State: "OPEN", Status: s.status, Priority: s.prio, Estimate: s.est,
 				Assignees: []Person{}, Labels: append([]string{}, s.labels...), Fields: map[string]string{},
 				UpdatedAt: now.Add(-time.Duration(i*3) * time.Hour),

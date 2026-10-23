@@ -238,19 +238,19 @@ const projectItemsQuery = `query($id: ID!, $cursor: String) {
           id type updatedAt
           content {
             ... on Issue {
-              title number url issueState: state
+              title body number url issueState: state
               repository { nameWithOwner }
               assignees(first: 10) { nodes { login name avatarUrl } }
               labels(first: 10) { nodes { name } }
             }
             ... on PullRequest {
-              title number url prState: state
+              title body number url prState: state
               repository { nameWithOwner }
               assignees(first: 10) { nodes { login name avatarUrl } }
               labels(first: 10) { nodes { name } }
             }
             ... on DraftIssue {
-              title
+              title body
               assignees(first: 10) { nodes { login name avatarUrl } }
             }
           }

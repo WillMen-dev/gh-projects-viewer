@@ -31,7 +31,7 @@ const itemsResp = `{"data":{"node":{
                     {"name":"Title","dataType":"TITLE"}]},
  "items":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[
   {"id":"PVTI_1","type":"ISSUE","updatedAt":"2026-10-02T10:00:00Z",
-   "content":{"title":"Login","number":7,"url":"https://github.com/acme/web/issues/7","issueState":"OPEN",
+   "content":{"title":"Login","body":"Formulario de acceso\ncon validación","number":7,"url":"https://github.com/acme/web/issues/7","issueState":"OPEN",
      "repository":{"nameWithOwner":"acme/web"},
      "assignees":{"nodes":[{"login":"ana","name":"Ana","avatarUrl":"https://avatars.githubusercontent.com/u/1"}]},
      "labels":{"nodes":[{"name":"frontend"}]}},
@@ -96,6 +96,9 @@ func TestGetProjectMapsFields(t *testing.T) {
 	if tk.Status != "Todo" || tk.Priority != "P0" || tk.Estimate != "3.5" ||
 		tk.StartDate != "2026-10-01" || tk.DueDate != "2026-10-20" || tk.Iteration != "Sprint 4" {
 		t.Fatalf("mapeo de campos incorrecto: %+v", tk)
+	}
+	if tk.Description != "Formulario de acceso\ncon validación" {
+		t.Fatalf("descripción incorrecta: %q", tk.Description)
 	}
 	if tk.State != "OPEN" {
 		t.Fatalf("estado GitHub no mapeado: %q", tk.State)
