@@ -1,4 +1,4 @@
-module github.com/wmendoza/gh-projects-viewer
+module gh-projects-viewer
 
 go 1.24
 

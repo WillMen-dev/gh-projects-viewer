@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/wmendoza/gh-projects-viewer/internal/auth"
-	"github.com/wmendoza/gh-projects-viewer/internal/store"
+	"gh-projects-viewer/internal/auth"
+	"gh-projects-viewer/internal/store"
 )
 
 func validEmail(e string) bool {

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wmendoza/gh-projects-viewer/internal/auth"
-	"github.com/wmendoza/gh-projects-viewer/internal/config"
-	"github.com/wmendoza/gh-projects-viewer/internal/github"
-	"github.com/wmendoza/gh-projects-viewer/internal/store"
+	"gh-projects-viewer/internal/auth"
+	"gh-projects-viewer/internal/config"
+	"gh-projects-viewer/internal/github"
+	"gh-projects-viewer/internal/store"
 )
 
 // check verifica configuración, GitHub y MongoDB, e imprime un diagnóstico legible.

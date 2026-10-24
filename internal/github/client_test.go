@@ -243,8 +243,8 @@ func TestAuthAndPermissionErrors(t *testing.T) {
 	if _, err := c.ListProjects(context.Background()); !errors.Is(err, ErrPermission) {
 		t.Fatalf("INSUFFICIENT_SCOPES => ErrPermission, obtuvo %v", err)
 	}
-	c, _ = newTestServer(t, func(string) (int, string) { return 200, `{"data":{"viewer":{"login":"wmendoza"}}}` })
-	if l, err := c.Viewer(context.Background()); err != nil || l != "wmendoza" {
+	c, _ = newTestServer(t, func(string) (int, string) { return 200, `{"data":{"viewer":{"login":"usuario-prueba"}}}` })
+	if l, err := c.Viewer(context.Background()); err != nil || l != "usuario-prueba" {
 		t.Fatalf("viewer: %q %v", l, err)
 	}
 	c, _ = newTestServer(t, func(string) (int, string) { return 200, `{"data":{"repositoryOwner":null}}` })

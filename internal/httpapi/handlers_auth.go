@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wmendoza/gh-projects-viewer/internal/auth"
-	"github.com/wmendoza/gh-projects-viewer/internal/store"
+	"gh-projects-viewer/internal/auth"
+	"gh-projects-viewer/internal/store"
 )
 
 func (s *Server) setSessionCookie(w http.ResponseWriter, token string) {

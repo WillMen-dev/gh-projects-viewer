@@ -13,12 +13,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wmendoza/gh-projects-viewer/internal/auth"
-	"github.com/wmendoza/gh-projects-viewer/internal/config"
-	"github.com/wmendoza/gh-projects-viewer/internal/github"
-	"github.com/wmendoza/gh-projects-viewer/internal/httpapi"
-	"github.com/wmendoza/gh-projects-viewer/internal/store"
-	"github.com/wmendoza/gh-projects-viewer/web"
+	"gh-projects-viewer/internal/auth"
+	"gh-projects-viewer/internal/config"
+	"gh-projects-viewer/internal/github"
+	"gh-projects-viewer/internal/httpapi"
+	"gh-projects-viewer/internal/store"
+	"gh-projects-viewer/web"
 )
 
 const usage = `Uso: server [comando]

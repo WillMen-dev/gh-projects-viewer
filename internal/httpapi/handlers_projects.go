@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wmendoza/gh-projects-viewer/internal/github"
+	"gh-projects-viewer/internal/github"
 )
 
 // Los IDs de ProjectV2 de GitHub tienen la forma "PVT_xxx". Se valida el formato antes de usarlo.

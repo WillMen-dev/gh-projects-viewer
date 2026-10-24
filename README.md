@@ -100,7 +100,7 @@ Los equipos de desarrollo organizan su trabajo en GitHub Projects, pero las áre
 
 | Concepto | Qué es |
 |---|---|
-| **Cuenta de usuario** | Cuenta personal de una persona en GitHub (p. ej. `WillMen-dev`). |
+| **Cuenta de usuario** | Cuenta personal de una persona en GitHub (p. ej. `ana-garcia`). |
 | **Organización** | Espacio compartido de una empresa o equipo (p. ej. `github.com/mi-empresa`). La crea cualquier cuenta (gratis) y queda como **dueña** (*owner*); invita a otras cuentas como **miembros**. Una cuenta puede pertenecer a varias organizaciones. |
 | **Repositorio** | Donde vive el código y los **issues** (tareas) y **pull requests** (cambios de código). |
 | **Project (GitHub Projects)** | Tablero/tabla de seguimiento que agrupa issues, pull requests y borradores de **uno o varios repositorios**, con campos como Status, Priority o fechas. Puede pertenecer a una organización (`github.com/orgs/ORG/projects/N`) o a un usuario (`github.com/users/USUARIO/projects/N`). |
