@@ -15,7 +15,8 @@ type DemoProvider struct {
 
 func NewDemoProvider() *DemoProvider {
 	now := time.Now().UTC()
-	day := func(offset int) string { return now.AddDate(0, 0, offset).Format("2006-01-02") }
+	// Las fechas se calculan en hora local, igual que el resumen (vencidas, por vencer).
+	day := func(offset int) string { return time.Now().AddDate(0, 0, offset).Format("2006-01-02") }
 
 	people := map[string]Person{
 		"ana":    {Login: "ana-dev", Name: "Ana Torres"},
@@ -39,7 +40,9 @@ func NewDemoProvider() *DemoProvider {
 			ID: id, Number: num, Title: title, ShortDescription: desc, Owner: owner, OwnerName: ownerName,
 			URL: fmt.Sprintf("https://github.com/orgs/%s/projects/%d", owner, num), UpdatedAt: now.Add(-time.Duration(num) * time.Hour),
 		}
-		d := &ProjectDetail{Project: p, StatusOptions: statuses, PriorityOption: priorities, FetchedAt: now, Tasks: []Task{}}
+		d := &ProjectDetail{Project: p, StatusOptions: statuses, PriorityOption: priorities, FetchedAt: now, Tasks: []Task{},
+			FieldNames: []string{"Title", "Assignees", "Status", "Labels", "Repository", "Milestone", "Priority", "Estimate", "Start date", "Target date"},
+			FieldRoles: map[string]string{"Status": "status", "Priority": "priority", "Estimate": "estimate", "Start date": "startDate", "Target date": "dueDate"}}
 		for i, s := range seeds {
 			t := Task{
 				ID: fmt.Sprintf("%s_item_%d", id, i+1), Type: s.typ, Title: s.title, Number: 100 + i,
