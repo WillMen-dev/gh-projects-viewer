@@ -140,6 +140,9 @@
     const isOverdue = (t) => t.dueDate && t.dueDate < today && !isDone(t);
 
     // Opciones de filtros
+    // Campos del proyecto que no tienen lugar propio en la vista (Milestone, campos personalizados…):
+    // se muestran todos en el detalle y en el CSV, tengan valor o no.
+    const otherFields = projectFields(data, tasks);
     const statuses = data.statusOptions.length ? [...data.statusOptions] : [...new Set(tasks.map((t) => t.status).filter(Boolean))];
     if (tasks.some((t) => !t.status)) statuses.push('');
     const priorities = data.priorityOptions.length ? data.priorityOptions : [...new Set(tasks.map((t) => t.priority).filter(Boolean))].sort();
@@ -190,7 +193,7 @@
     }
 
     function card(t) {
-      return h('button', { class: 'task-card' + (isOverdue(t) ? ' is-overdue' : ''), type: 'button', onclick: () => openModal(taskDetail(t)) },
+      return h('button', { class: 'task-card' + (isOverdue(t) ? ' is-overdue' : ''), type: 'button', onclick: () => openModal(taskDetail(t, otherFields)) },
         h('div', { class: 'task-card-top' },
           h('span', { class: 'small muted', text: t.number ? `${t.repository.split('/').pop()} #${t.number}` : typeLabel[t.type] || t.type }),
           prioBadge(t.priority)),
@@ -228,7 +231,7 @@
             onclick: () => { if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; } render(); },
           }, label, sortKey === k ? (sortDir > 0 ? ' ▲' : ' ▼') : ''))))),
         h('tbody', {}, ...sorted.map((t) => h('tr', { class: isOverdue(t) ? 'row-overdue' : '' },
-          h('td', {}, h('button', { class: 'link-btn', type: 'button', onclick: () => openModal(taskDetail(t)), text: t.title }),
+          h('td', {}, h('button', { class: 'link-btn', type: 'button', onclick: () => openModal(taskDetail(t, otherFields)), text: t.title }),
             h('div', { class: 'small muted', text: t.number ? `${t.repository} #${t.number}` : typeLabel[t.type] || '' })),
           h('td', { text: t.status || '—' }),
           h('td', {}, prioBadge(t.priority) || '—'),
@@ -257,7 +260,7 @@
     const clearBtn = h('button', { class: 'btn btn-ghost', type: 'button', text: 'Limpiar filtros', onclick: () => {
       fSearch.value = ''; fStatus.value = '*'; fPrio.value = '*'; fAssignee.value = '*'; fOverdue.checked = false; render();
     } });
-    const exportBtn = h('button', { class: 'btn btn-ghost', type: 'button', text: 'Exportar CSV', onclick: () => exportCSV(project, filtered()) });
+    const exportBtn = h('button', { class: 'btn btn-ghost', type: 'button', text: 'Exportar CSV', onclick: () => exportCSV(project, filtered(), otherFields) });
     const refreshBtn = h('button', { class: 'btn', type: 'button', text: 'Actualizar desde GitHub', onclick: async () => {
       refreshBtn.disabled = true;
       try { await API.post('/api/projects/' + encodeURIComponent(id) + '/refresh'); viewProject(id); }
@@ -319,7 +322,24 @@
         barList('Por prioridad', s.byPriority, s.total)));
   }
 
-  function taskDetail(t) {
+  // Campos con lugar propio en la vista; el resto se lista aparte.
+  const coveredFields = new Set(['Title', 'Assignees', 'Labels', 'Repository', 'Updated']);
+  // Nombres en español de los campos propios de GitHub.
+  const builtinLabels = {
+    'Milestone': 'Milestone', 'Linked pull requests': 'Pull requests vinculados', 'Reviewers': 'Revisores',
+    'Parent issue': 'Issue padre', 'Sub-issues progress': 'Progreso de sub-issues', 'Created': 'Creado', 'Closed': 'Cerrado',
+  };
+  const fieldLabel = (n) => builtinLabels[n] || n;
+
+  function projectFields(data, tasks) {
+    const roles = data.fieldRoles || {};
+    const names = [...(data.fieldNames || [])];
+    // Valores de campos que el proyecto no declaró (p. ej. en modo demo) también se muestran.
+    tasks.forEach((t) => Object.keys(t.fields || {}).forEach((n) => { if (!names.includes(n)) names.push(n); }));
+    return names.filter((n) => !coveredFields.has(n) && !roles[n]);
+  }
+
+  function taskDetail(t, otherFields) {
     const rows = [
       ['Tipo', typeLabel[t.type] || t.type],
       ['Repositorio', t.repository ? `${t.repository}${t.number ? ' #' + t.number : ''}` : '—'],
@@ -332,8 +352,7 @@
       ['Iteración', t.iteration || '—'],
       ['Última actualización', fmtDateTime(t.updatedAt)],
     ];
-    const known = new Set(['Status', 'Priority', 'Estimate', 'Start date', 'Target date']);
-    const extra = Object.entries(t.fields || {}).filter(([k, v]) => v && !known.has(k) && !rows.some((r) => r[1] === v));
+    const extra = otherFields.map((n) => [fieldLabel(n), (t.fields || {})[n] || '—']);
     return h('div', {},
       h('h2', { id: 'modal-title', text: t.title }),
       h('div', { class: 'description', text: t.description || 'Sin descripción' }),
@@ -345,16 +364,16 @@
 
   // Exporta a CSV las tareas filtradas. Neutraliza "inyección de fórmulas" en Excel/Sheets:
   // celdas que empiezan con = + - @ se prefijan con comilla simple.
-  function exportCSV(project, list) {
+  function exportCSV(project, list, otherFields) {
     const cell = (v) => {
       let s = String(v == null ? '' : v);
       if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
       return '"' + s.replace(/"/g, '""') + '"';
     };
-    const header = ['Organización', 'Proyecto', 'Título', 'Descripción', 'Tipo', 'Repositorio', 'Número', 'Estado', 'Prioridad', 'Responsables', 'Estimación', 'Inicio', 'Entrega', 'Etiquetas', 'URL'];
+    const header = ['Organización', 'Proyecto', 'Título', 'Descripción', 'Tipo', 'Repositorio', 'Número', 'Estado', 'Prioridad', 'Responsables', 'Estimación', 'Inicio', 'Entrega', 'Etiquetas', 'URL', ...otherFields.map(fieldLabel)];
     const lines = [header.map(cell).join(',')].concat(list.map((t) => [
       ownerLabel(project), project.title, t.title, t.description, typeLabel[t.type] || t.type, t.repository, t.number || '', t.status, t.priority,
-      t.assignees.map((a) => a.login).join('; '), t.estimate, t.startDate, t.dueDate, t.labels.join('; '), t.url,
+      t.assignees.map((a) => a.login).join('; '), t.estimate, t.startDate, t.dueDate, t.labels.join('; '), t.url, ...otherFields.map((n) => (t.fields || {})[n] || ''),
     ].map(cell).join(',')));
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = h('a', { download: `${slug(project.owner) || 'org'}-${slug(project.title) || 'proyecto'}-${todayISO()}.csv` });

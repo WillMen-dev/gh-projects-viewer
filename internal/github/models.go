@@ -49,13 +49,14 @@ type Task struct {
 
 // ProjectDetail agrupa el proyecto, sus tareas y las opciones de los campos.
 type ProjectDetail struct {
-	Project        Project   `json:"project"`
-	Tasks          []Task    `json:"tasks"`
-	StatusOptions  []string  `json:"statusOptions"`
-	PriorityOption []string  `json:"priorityOptions"`
-	FetchedAt      time.Time `json:"fetchedAt"`
-	Truncated      bool      `json:"truncated"`
-	FieldNames     []string  `json:"fieldNames"` // nombres de todos los campos del proyecto
+	Project        Project           `json:"project"`
+	Tasks          []Task            `json:"tasks"`
+	StatusOptions  []string          `json:"statusOptions"`
+	PriorityOption []string          `json:"priorityOptions"`
+	FetchedAt      time.Time         `json:"fetchedAt"`
+	Truncated      bool              `json:"truncated"`
+	FieldNames     []string          `json:"fieldNames"` // nombres de todos los campos del proyecto, en el orden de GitHub
+	FieldRoles     map[string]string `json:"fieldRoles"` // campo -> dato que representa (status, priority, estimate, startDate, dueDate, iteration)
 }
 
 // Provider es la fuente de datos (GitHub real o datos de demostración).

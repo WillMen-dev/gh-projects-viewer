@@ -34,7 +34,10 @@ const itemsResp = `{"data":{"node":{
    "content":{"title":"Login","body":"Formulario de acceso\ncon validación","number":7,"url":"https://github.com/acme/web/issues/7","issueState":"OPEN",
      "repository":{"nameWithOwner":"acme/web"},
      "assignees":{"nodes":[{"login":"ana","name":"Ana","avatarUrl":"https://avatars.githubusercontent.com/u/1"}]},
-     "labels":{"nodes":[{"name":"frontend"}]}},
+     "labels":{"nodes":[{"name":"frontend"}]},
+     "createdAt":"2026-09-30T08:00:00Z","closedAt":null,
+     "parent":{"title":"Épica de acceso","number":1},
+     "subIssuesSummary":{"total":4,"completed":1,"percentCompleted":25}},
    "fieldValues":{"nodes":[
      {"text":"Login","field":{"name":"Title"}},
      {"name":"Todo","field":{"name":"Status"}},
@@ -43,6 +46,9 @@ const itemsResp = `{"data":{"node":{
      {"date":"2026-10-01","field":{"name":"Start date"}},
      {"date":"2026-10-20","field":{"name":"Target date"}},
      {"title":"Sprint 4","field":{"name":"Iteration"}},
+     {"milestone":{"title":"Versión 1.0"},"field":{"name":"Milestone"}},
+     {"pullRequests":{"nodes":[{"number":9},{"number":12}]},"field":{"name":"Linked pull requests"}},
+     {"reviewers":{"nodes":[{"login":"ana"},{"name":"Equipo QA"}]},"field":{"name":"Reviewers"}},
      {}
    ]}},
   {"id":"PVTI_2","type":"DRAFT_ISSUE","updatedAt":"2026-10-02T10:00:00Z",
@@ -99,6 +105,21 @@ func TestGetProjectMapsFields(t *testing.T) {
 	}
 	if d.Project.Owner != "acme" || d.Project.OwnerName != "Acme S.A." {
 		t.Fatalf("dueño del proyecto incorrecto: %+v", d.Project)
+	}
+	want := map[string]string{
+		"Milestone": "Versión 1.0", "Linked pull requests": "#9, #12", "Reviewers": "ana, Equipo QA",
+		"Parent issue": "#1 Épica de acceso", "Sub-issues progress": "1/4 (25 %)", "Created": "2026-09-30", "Updated": "2026-10-02",
+	}
+	for k, v := range want {
+		if tk.Fields[k] != v {
+			t.Errorf("campo %q = %q, esperaba %q", k, tk.Fields[k], v)
+		}
+	}
+	if _, ok := tk.Fields["Closed"]; ok {
+		t.Error("una tarea abierta no debe tener fecha de cierre")
+	}
+	if d.FieldRoles["Status"] != "status" || d.FieldRoles["Priority"] != "priority" || d.FieldRoles["Title"] != "" {
+		t.Errorf("roles de campos incorrectos: %v", d.FieldRoles)
 	}
 	if tk.Description != "Formulario de acceso\ncon validación" {
 		t.Fatalf("descripción incorrecta: %q", tk.Description)

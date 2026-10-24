@@ -324,29 +324,34 @@ const projectItemsQuery = `query($id: ID!, $cursor: String) {
           id type updatedAt
           content {
             ... on Issue {
-              title body number url issueState: state
+              title body number url issueState: state createdAt closedAt
+              parent { title number }
+              subIssuesSummary { total completed percentCompleted }
               repository { nameWithOwner }
               assignees(first: 10) { nodes { login name avatarUrl } }
               labels(first: 10) { nodes { name } }
             }
             ... on PullRequest {
-              title body number url prState: state
+              title body number url prState: state createdAt closedAt
               repository { nameWithOwner }
               assignees(first: 10) { nodes { login name avatarUrl } }
               labels(first: 10) { nodes { name } }
             }
             ... on DraftIssue {
-              title body
+              title body createdAt
               assignees(first: 10) { nodes { login name avatarUrl } }
             }
           }
-          fieldValues(first: 30) {
+          fieldValues(first: 50) {
             nodes {
               ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
               ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
               ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
               ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2FieldCommon { name } } }
               ... on ProjectV2ItemFieldIterationValue { title field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldMilestoneValue { milestone { title } field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldPullRequestValue { pullRequests(first: 10) { nodes { number } } field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldReviewerValue { reviewers(first: 10) { nodes { ... on User { login } ... on Team { name } } } field { ... on ProjectV2FieldCommon { name } } }
             }
           }
         }

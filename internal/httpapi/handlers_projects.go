@@ -94,6 +94,8 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		"priorityOptions": detail.PriorityOption,
 		"fetchedAt":       detail.FetchedAt,
 		"truncated":       detail.Truncated,
+		"fieldNames":      detail.FieldNames,
+		"fieldRoles":      detail.FieldRoles,
 		"summary":         s.summarize(detail.Tasks),
 		"doneStatuses":    s.opts.DoneStatuses,
 	})

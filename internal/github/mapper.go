@@ -1,6 +1,7 @@
 package github
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,17 @@ type rawContent struct {
 	} `json:"repository"`
 	Assignees *rawPeople `json:"assignees"`
 	Labels    *rawLabels `json:"labels"`
+	CreatedAt string     `json:"createdAt"`
+	ClosedAt  string     `json:"closedAt"`
+	Parent    *struct {
+		Title  string `json:"title"`
+		Number int    `json:"number"`
+	} `json:"parent"`
+	SubIssuesSummary *struct {
+		Total            int `json:"total"`
+		Completed        int `json:"completed"`
+		PercentCompleted int `json:"percentCompleted"`
+	} `json:"subIssuesSummary"`
 }
 
 type rawFieldValue struct {
@@ -38,7 +50,22 @@ type rawFieldValue struct {
 	Number *float64 `json:"number"`
 	Date   *string  `json:"date"`
 	Title  *string  `json:"title"`
-	Field  *struct {
+	// Campos propios de GitHub (no creados por el usuario).
+	Milestone *struct {
+		Title string `json:"title"`
+	} `json:"milestone"`
+	PullRequests *struct {
+		Nodes []*struct {
+			Number int `json:"number"`
+		} `json:"nodes"`
+	} `json:"pullRequests"`
+	Reviewers *struct {
+		Nodes []*struct {
+			Login string `json:"login"`
+			Name  string `json:"name"`
+		} `json:"nodes"`
+	} `json:"reviewers"`
+	Field *struct {
 		Name string `json:"name"`
 	} `json:"field"`
 }
@@ -87,10 +114,13 @@ func matches(name string, aliases []string) bool {
 }
 
 func mapProjectHeader(p *rawProject, m FieldMapping) *ProjectDetail {
-	d := &ProjectDetail{Project: p.Project, Tasks: []Task{}, StatusOptions: []string{}, PriorityOption: []string{}, FieldNames: []string{}}
+	d := &ProjectDetail{Project: p.Project, Tasks: []Task{}, StatusOptions: []string{}, PriorityOption: []string{}, FieldNames: []string{}, FieldRoles: map[string]string{}}
 	for _, f := range p.Fields.Nodes {
 		if f != nil && f.Name != "" {
 			d.FieldNames = append(d.FieldNames, f.Name)
+			if role := fieldRole(f.Name, f.DataType, m); role != "" {
+				d.FieldRoles[f.Name] = role
+			}
 		}
 		if f == nil || len(f.Options) == 0 {
 			continue
@@ -107,6 +137,33 @@ func mapProjectHeader(p *rawProject, m FieldMapping) *ProjectDetail {
 		}
 	}
 	return d
+}
+
+// fieldRole indica qué dato de la tarea representa un campo del proyecto, o "" si es un campo más.
+func fieldRole(name, dataType string, m FieldMapping) string {
+	switch {
+	case matches(name, m.Status):
+		return "status"
+	case matches(name, m.Priority):
+		return "priority"
+	case matches(name, m.Estimate):
+		return "estimate"
+	case matches(name, m.StartDate):
+		return "startDate"
+	case matches(name, m.DueDate):
+		return "dueDate"
+	case dataType == "ITERATION":
+		return "iteration"
+	}
+	return ""
+}
+
+// datePart devuelve la fecha (YYYY-MM-DD) de una marca de tiempo RFC 3339, o "" si viene vacía.
+func datePart(ts string) string {
+	if len(ts) >= 10 {
+		return ts[:10]
+	}
+	return ""
 }
 
 func formatNumber(f float64) string {
@@ -148,6 +205,22 @@ func mapItem(it *rawItem, m FieldMapping) Task {
 				}
 			}
 		}
+		// Campos propios de GitHub que vienen del issue/PR y no de los valores del proyecto.
+		if c.Parent != nil {
+			t.Fields["Parent issue"] = "#" + strconv.Itoa(c.Parent.Number) + " " + c.Parent.Title
+		}
+		if s := c.SubIssuesSummary; s != nil && s.Total > 0 {
+			t.Fields["Sub-issues progress"] = fmt.Sprintf("%d/%d (%d %%)", s.Completed, s.Total, s.PercentCompleted)
+		}
+		if d := datePart(c.CreatedAt); d != "" {
+			t.Fields["Created"] = d
+		}
+		if d := datePart(c.ClosedAt); d != "" {
+			t.Fields["Closed"] = d
+		}
+	}
+	if !it.UpdatedAt.IsZero() {
+		t.Fields["Updated"] = it.UpdatedAt.Format("2006-01-02")
 	}
 	if t.Title == "" {
 		if it.Type == "REDACTED" || (it.Content == nil && it.Type != "DRAFT_ISSUE") {
@@ -173,6 +246,26 @@ func mapItem(it *rawItem, m FieldMapping) Task {
 			val = *fv.Date
 		case fv.Title != nil:
 			val = *fv.Title
+		case fv.Milestone != nil:
+			val = fv.Milestone.Title
+		case fv.PullRequests != nil:
+			var prs []string
+			for _, pr := range fv.PullRequests.Nodes {
+				if pr != nil {
+					prs = append(prs, "#"+strconv.Itoa(pr.Number))
+				}
+			}
+			val = strings.Join(prs, ", ")
+		case fv.Reviewers != nil:
+			var revs []string
+			for _, r := range fv.Reviewers.Nodes {
+				if r != nil && r.Login != "" {
+					revs = append(revs, r.Login)
+				} else if r != nil && r.Name != "" {
+					revs = append(revs, r.Name)
+				}
+			}
+			val = strings.Join(revs, ", ")
 		default:
 			continue
 		}
