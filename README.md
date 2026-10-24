@@ -8,6 +8,7 @@ Aplicación web interna que muestra los **proyectos y tareas de GitHub Projects*
 
 ## Contenido
 
+0. [Inicio rápido: después de clonar el repo](#inicio-rápido-después-de-clonar-el-repo)
 1. [Qué es y qué alcance tiene](#1-qué-es-y-qué-alcance-tiene)
 2. [Cómo funciona](#2-cómo-funciona)
 3. [Conceptos de GitHub que hay que conocer](#3-conceptos-de-github-que-hay-que-conocer)
@@ -19,14 +20,120 @@ Aplicación web interna que muestra los **proyectos y tareas de GitHub Projects*
 9. [Preparar los Projects en GitHub](#9-preparar-los-projects-en-github)
 10. [Guía del usuario (rol Consulta)](#10-guía-del-usuario-rol-consulta)
 11. [Guía del administrador de la aplicación](#11-guía-del-administrador-de-la-aplicación)
-12. [Guía de TI: operación y mantenimiento](#12-guía-de-ti-operación-y-mantenimiento)
-13. [Guía técnica para desarrolladores](#13-guía-técnica-para-desarrolladores)
-14. [Base de datos](#14-base-de-datos)
-15. [Seguridad](#15-seguridad)
-16. [Límites conocidos y posibles mejoras](#16-límites-conocidos-y-posibles-mejoras)
-17. [Solución de problemas](#17-solución-de-problemas)
-18. [Glosario](#18-glosario)
-19. [Referencia rápida de comandos](#19-referencia-rápida-de-comandos)
+12. [Cómo probar la app (lista de verificación)](#12-cómo-probar-la-app-lista-de-verificación)
+13. [Guía de TI: operación y mantenimiento](#13-guía-de-ti-operación-y-mantenimiento)
+14. [Guía técnica para desarrolladores](#14-guía-técnica-para-desarrolladores)
+15. [Base de datos](#15-base-de-datos)
+16. [Seguridad](#16-seguridad)
+17. [Límites conocidos y posibles mejoras](#17-límites-conocidos-y-posibles-mejoras)
+18. [Solución de problemas](#18-solución-de-problemas)
+19. [Glosario](#19-glosario)
+20. [Referencia rápida de comandos](#20-referencia-rápida-de-comandos)
+
+---
+
+## Inicio rápido: después de clonar el repo
+
+Elija el camino según lo que quiera hacer. Todos empiezan igual:
+
+```bash
+git clone <URL-del-repositorio> gh-projects-viewer
+cd gh-projects-viewer
+```
+
+| Quiero… | Camino | Necesito | Tiempo |
+|---|---|---|---|
+| Ver la app funcionando, sin configurar GitHub | **Camino 1**: demo con Docker | Docker | 5 min |
+| Probarla con mis proyectos reales de GitHub | **Camino 2**: GitHub real con Docker | Docker + token de GitHub | 15 min |
+| Instalarla en el servidor de la empresa | **Camino 3**: [sección 6](#6-instalación-en-un-servidor-producción) | Servidor con Docker + token | 30 min |
+| Probarla o modificarla sin Docker | [Sección 7](#7-instalación-local-para-probar-mac-linux-o-windows) | Go (y MongoDB) | 10 min |
+
+### Paso 0. Instalar Docker (una sola vez)
+
+Docker arma y enciende la aplicación y su base de datos con un solo comando, sin instalar nada más. Cualquiera de estas opciones sirve; los comandos de la aplicación son idénticos en todas.
+
+**Linux (Ubuntu, Debian y similares)**, Docker Engine:
+```bash
+curl -fsSL https://get.docker.com | sudo sh   # instala Docker Engine y Docker Compose
+sudo usermod -aG docker $USER                 # usar docker sin sudo (cierre sesión y vuelva a entrar)
+docker --version && docker compose version    # verificar
+```
+Más opciones: https://docs.docker.com/engine/install/
+
+**Windows 10/11**, Docker Desktop:
+1. Descargar e instalar https://www.docker.com/products/docker-desktop/ (acepta activar WSL 2 si lo pide y reinicia).
+2. Abrir **Docker Desktop** y esperar a que diga *Engine running*.
+3. En PowerShell: `docker --version` y `docker compose version`.
+4. Instalar Git si no lo tiene: https://git-scm.com/download/win
+
+**Mac**, cualquiera de las dos:
+- **Docker Desktop:** descargar de https://www.docker.com/products/docker-desktop/, abrirlo y esperar a que diga *Engine running*.
+- **Colima** (sin interfaz gráfica, gratis), con Homebrew (https://brew.sh):
+  ```bash
+  brew install colima docker docker-compose
+  mkdir -p ~/.docker/cli-plugins
+  ln -sfn /opt/homebrew/opt/docker-compose/bin/docker-compose ~/.docker/cli-plugins/docker-compose
+  colima start --cpu 2 --memory 4     # encender (después de reiniciar el Mac: colima start)
+  ```
+
+> Docker Desktop es gratis para uso personal, educación y empresas pequeñas; las empresas grandes requieren licencia. Docker Engine (Linux) y Colima son gratis sin condiciones.
+
+### Camino 1. Ver la app con datos de demostración (sin GitHub)
+
+1. Crear la configuración:
+   ```bash
+   cp .env.example .env
+   ```
+2. Abrir `.env` con un editor y cambiar **solo** estas líneas:
+   ```ini
+   GITHUB_MODE=demo
+   BOOTSTRAP_ADMIN_EMAIL=admin@empresa.com
+   BOOTSTRAP_ADMIN_PASSWORD=CambiarEsta2026
+   MONGO_ROOT_PASSWORD=clave-root-de-prueba-123
+   MONGO_APP_PASSWORD=clave-app-de-prueba-456
+   COOKIE_SECURE=false
+   ```
+3. Encender:
+   ```bash
+   docker compose up -d --build
+   ```
+   La primera vez tarda unos minutos (descarga, ejecuta las pruebas automáticas y compila).
+4. Abrir **http://localhost:8080** e ingresar con `admin@empresa.com` / `CambiarEsta2026`. Pedirá una contraseña nueva (12+ caracteres, letras y números).
+5. Se ven 3 proyectos ficticios de 2 organizaciones. Para recorrer todas las funciones, siga la [sección 12](#12-cómo-probar-la-app-lista-de-verificación).
+6. Apagar cuando termine: `docker compose down` (los usuarios se conservan para la próxima vez).
+
+### Camino 2. Probar con sus proyectos reales de GitHub
+
+1. Generar un token de GitHub de solo lectura: [sección 6, paso 1](#paso-1-generar-el-token-de-github-dueño-de-github) (permisos `read:project`, `read:org` y `repo`).
+2. Crear la configuración (si ya hizo el camino 1, edite el mismo `.env`):
+   ```bash
+   cp .env.example .env
+   ```
+3. En `.env`:
+   ```ini
+   GITHUB_MODE=api
+   GITHUB_TOKEN=ghp_su_token
+   GITHUB_OWNER_TYPE=auto              # todas las organizaciones de su cuenta
+   GITHUB_OWNER=su-usuario-de-github   # opcional: para ver también sus Projects personales
+   BOOTSTRAP_ADMIN_EMAIL=su-correo@empresa.com
+   BOOTSTRAP_ADMIN_PASSWORD=UnaClaveTemporal2026
+   MONGO_ROOT_PASSWORD=clave-root-larga
+   MONGO_APP_PASSWORD=clave-app-larga
+   COOKIE_SECURE=false
+   ```
+4. Encender y verificar:
+   ```bash
+   docker compose up -d --build
+   docker compose run --rm app check     # debe terminar en "Todo listo"
+   ```
+   Si aparece ❌ o ⚠️, el mensaje dice qué corregir (ver también la [sección 18](#18-solución-de-problemas)).
+5. Abrir **http://localhost:8080**, ingresar, cambiar la contraseña y ver sus proyectos.
+
+> Si antes encendió el camino 1, el administrador ya existe con la contraseña que puso entonces: `BOOTSTRAP_ADMIN_*` solo se usa con la base vacía. Para empezar de cero: `docker compose down -v` (**borra** los usuarios de prueba) y luego `docker compose up -d --build`.
+
+### Camino 3. Instalar en el servidor de la empresa
+
+Siga la [sección 6](#6-instalación-en-un-servidor-producción) completa: token, `.env`, inicio, primer ingreso y HTTPS.
 
 ---
 
@@ -121,7 +228,7 @@ Los equipos de desarrollo organizan su trabajo en GitHub Projects, pero las áre
 |---|---|
 | Sistema operativo | Linux (recomendado: Ubuntu 22.04+ o Debian 12+), Windows Server o macOS. |
 | Hardware mínimo | 1 vCPU, 1 GB de RAM, 5 GB de disco. Para decenas de usuarios es suficiente. |
-| Software | **Docker** con **Docker Compose** y **Git**. Nada más: la aplicación y MongoDB corren dentro de Docker. |
+| Software | **Docker** con **Docker Compose** (Docker Engine en Linux; Docker Desktop en Windows/Mac) y **Git**. Nada más: la aplicación y MongoDB corren dentro de Docker. Ver [Paso 0](#paso-0-instalar-docker-una-sola-vez). |
 | Red | Salida a internet hacia `api.github.com` (puerto 443). Acceso desde la red de los usuarios al puerto de la aplicación. |
 | Opcional | Un dominio (p. ej. `proyectos.empresa.com`) y un proxy HTTPS (Caddy o Nginx). |
 
@@ -182,10 +289,17 @@ El token es una llave de **solo lectura**. La aplicación nunca modifica nada en
 
 ### Paso 2. Preparar el servidor (TI)
 
-Instalar Docker y Git:
+Instalar Docker y Git según el sistema del servidor (detalle en [Paso 0](#paso-0-instalar-docker-una-sola-vez)):
 
-- **Ubuntu/Debian:** https://docs.docker.com/engine/install/ y `sudo apt install git`.
-- **Windows / Mac:** Docker Desktop (https://www.docker.com/products/docker-desktop/) y Git (https://git-scm.com/).
+- **Ubuntu/Debian:**
+  ```bash
+  sudo apt update && sudo apt install -y git
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker $USER      # cerrar sesión y volver a entrar
+  ```
+- **Windows Server / Windows / Mac:** Docker Desktop (https://www.docker.com/products/docker-desktop/) y Git (https://git-scm.com/).
+
+Docker arranca solo al encender el servidor, y los contenedores de la aplicación están configurados con `restart: unless-stopped`: tras un reinicio del servidor, la aplicación vuelve a funcionar sin intervención.
 
 Verificar:
 ```bash
@@ -235,6 +349,8 @@ Luego elegir el escenario de acceso:
 | **Solo red interna, sin HTTPS**: se abre como `http://IP-del-servidor:8080` | `8080` | `false` | `false` |
 
 > Con `COOKIE_SECURE=true` y sin HTTPS, **el inicio de sesión no funciona** (el navegador no guarda la sesión y vuelve a la pantalla de ingreso).
+
+Si la empresa no está en Colombia, cambie también `TZ` (zona horaria con la que se calculan las tareas vencidas), p. ej. `TZ=America/Mexico_City`.
 
 El resto de variables tiene valores por defecto adecuados. La referencia completa está en la [sección 8](#8-configuración-referencia-completa-del-archivo-env).
 
@@ -398,6 +514,7 @@ Si alguien renombra un campo en GitHub (p. ej. "Status" → "Etapa"), hay que ag
 
 | Variable | Por defecto | Descripción |
 |---|---|---|
+| `TZ` | `America/Bogota` en `.env.example` (`UTC` si falta) | Zona horaria con la que se calcula "hoy" para vencidas y por vencer (p. ej. `America/Mexico_City`, `Europe/Madrid`). **Importante con Docker**: sin ella el contenedor usa UTC y, en Colombia, entre las 7 p. m. y la medianoche las tareas que vencen hoy saldrían como vencidas. |
 | `APP_ADDR` | `:8080` | Dirección de escucha fuera de Docker. `127.0.0.1:8080` = solo el mismo equipo. |
 | `APP_PUBLISH` | `127.0.0.1:8080` | Solo Docker: dónde se publica la aplicación. `8080` = toda la red. |
 | `COOKIE_SECURE` | `true` (`false` en `.env.example`) | `true` con HTTPS. `false` solo para `http://` (pruebas o red interna). |
@@ -495,7 +612,7 @@ Arriba se ve **la organización**, el nombre del proyecto, su descripción y la 
 | **Estimación completada** | Suma de la estimación de las tareas completadas frente al total (solo si hay estimaciones). |
 | **Por estado / responsable / prioridad** | Cantidad de tareas en cada valor, con barras. Una tarea con dos responsables cuenta para ambos. |
 
-"Hoy" es la fecha del servidor (su zona horaria).
+"Hoy" es la fecha en la zona horaria configurada en `TZ` (por defecto en `.env.example`: Colombia).
 
 ### 10.5 Tablero y Tabla
 
@@ -615,9 +732,142 @@ Cambiar `BOOTSTRAP_ADMIN_PASSWORD` en `.env` **no** sirve para esto: solo se usa
 
 ---
 
-## 12. Guía de TI: operación y mantenimiento
+## 12. Cómo probar la app (lista de verificación)
 
-### 12.1 Tareas periódicas
+Recorrido completo para comprobar que todo funciona, por ejemplo después de instalar o actualizar. Marque cada prueba; si alguna no da el resultado esperado, vea la [sección 18](#18-solución-de-problemas).
+
+### 12.1 Preparación
+
+| Opción | Comandos | Datos que verá |
+|---|---|---|
+| **Con datos de demostración** | [Camino 1](#camino-1-ver-la-app-con-datos-de-demostración-sin-github) del inicio rápido | 3 proyectos ficticios de 2 organizaciones |
+| **Con GitHub real** | [Camino 2](#camino-2-probar-con-sus-proyectos-reales-de-github) del inicio rápido | Sus Projects reales |
+
+Antes de empezar, verifique que todo está encendido:
+```bash
+docker compose ps                     # "app" y "mongo" deben decir "healthy"
+docker compose run --rm app check     # debe terminar en "Todo listo"
+```
+
+Los resultados esperados entre paréntesis *(demo: …)* corresponden a los datos de demostración.
+
+### 12.2 Pruebas automáticas (opcional, requiere Go)
+
+```bash
+go vet ./...
+go test ./...
+```
+Esperado: `ok` en todos los paquetes. (Con Docker ya se ejecutan al construir la imagen: si fallaran, `docker compose up --build` se detendría.)
+
+### 12.3 Ingreso y contraseñas
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 1 | Abrir http://localhost:8080 sin haber ingresado | Lleva a la pantalla de ingreso |
+| 2 | Ingresar con una contraseña incorrecta | "Correo o contraseña incorrectos" |
+| 3 | Ingresar con `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` | Pide cambiar la contraseña; no deja ver proyectos hasta cambiarla |
+| 4 | Poner una contraseña nueva corta (p. ej. `abc123`) | La rechaza (mínimo 12 caracteres, letras y números) |
+| 5 | Poner una contraseña válida | Entra a la lista de proyectos |
+| 6 | Pulsar **Salir** y volver a ingresar con la contraseña nueva | Funciona; la temporal ya no sirve |
+
+### 12.4 Lista de proyectos
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 7 | Ver la lista | Proyectos agrupados por organización *(demo: "Empresa Demo S.A.S." con 2 y "Filial Demo" con 1)* |
+| 8 | Escribir parte de un nombre en **Buscar proyecto** | Solo quedan los que coinciden *(demo: "rrhh" → "Sistema interno RRHH")* |
+| 9 | Elegir una organización en el filtro de organizaciones | Solo sus proyectos (el filtro aparece si hay más de una) |
+| 10 | Marcar **Mostrar cerrados** | Aparecen también los proyectos cerrados en GitHub, atenuados |
+
+### 12.5 Proyecto: resumen, tablero y tabla
+
+Abrir un proyecto *(demo: "Portal de clientes")*.
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 11 | Encabezado | "Organización: …", nombre, descripción y hora de consulta |
+| 12 | Tarjetas del resumen | Coinciden con GitHub *(demo: 8 tareas, 2 completadas, 6 abiertas, 1 vencida, 25 % de avance)* |
+| 13 | Barras por estado, responsable y prioridad | Suman lo mismo que el total |
+| 14 | **Tablero** | Una columna por estado, en el orden de GitHub *(demo: Todo, In Progress, In Review, Done)*; la tarea vencida con borde rojo |
+| 15 | **Tabla** → clic en "Entrega", y otro clic | Ordena por fecha; el segundo clic invierte el orden |
+| 16 | Comparar 5 tareas con GitHub (título, estado, responsable, prioridad, fechas) | Coinciden (solo con GitHub real) |
+
+### 12.6 Filtros y búsqueda
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 17 | Marcar **Solo vencidas** | Solo las vencidas *(demo: "Pantalla de historial de pedidos")* |
+| 18 | Filtrar por prioridad P0 | Solo tareas P0 |
+| 19 | Filtrar por un responsable, y luego por "Sin responsable" | Solo sus tareas; luego solo las que no tienen responsable |
+| 20 | Buscar una palabra que solo esté en la **descripción** de una tarea | Aparece esa tarea *(demo: "aceptación" muestra todas)* |
+| 21 | **Limpiar filtros** | Vuelven todas las tareas |
+
+### 12.7 Detalle de una tarea
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 22 | Clic en una tarea | Se abre el detalle con título y descripción completa |
+| 23 | Revisar los campos | Tipo, repositorio, estados, prioridad, estimación, fechas, responsables, etiquetas y **todos los campos del proyecto**, con "—" los vacíos *(demo: "Milestone: —")* |
+| 24 | Con GitHub real: poner un milestone o un campo personalizado a una tarea en GitHub y pulsar **Actualizar desde GitHub** | El valor aparece en el detalle |
+| 25 | Tecla **Esc** | Cierra el detalle |
+
+### 12.8 Exportar CSV
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 26 | Sin filtros, **Exportar CSV** | Se descarga `organizacion-proyecto-fecha.csv` |
+| 27 | Abrirlo en Excel, Numbers o Google Sheets | Tildes correctas; columnas Organización, Proyecto, Título, Descripción… y una por cada campo adicional; mismas tareas que en pantalla |
+| 28 | Con **Solo vencidas** marcado, exportar de nuevo | El CSV solo trae las vencidas |
+
+### 12.9 Cambios en GitHub (solo con GitHub real)
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 29 | En GitHub, cambiar el estado de una tarea; en la app pulsar **Actualizar desde GitHub** | El cambio se ve al instante |
+| 30 | Cambiar otra tarea en GitHub, **no** pulsar actualizar, esperar 2 minutos y recargar | El cambio se ve (la caché expiró) |
+| 31 | Agregar una opción nueva a Status (p. ej. "Ready") y actualizar | Aparece como columna nueva en el tablero |
+| 32 | Crear un campo nuevo en el Project y actualizar | Aparece en el detalle de las tareas, con "—" |
+
+### 12.10 Usuarios y permisos
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 33 | **Administración → Crear usuario**: rol *Consulta*, contraseña con **Generar** | Aparece en la lista como "Activo (clave temporal)" |
+| 34 | En una **ventana privada** (Ctrl+Shift+N / Cmd+Shift+N), ingresar con ese usuario | Pide cambiar la contraseña |
+| 35 | Ya dentro como Consulta | No aparece el menú **Administración** |
+| 36 | Como Consulta, abrir http://localhost:8080/api/admin/users | Error de acceso (403) |
+| 37 | Como administrador, **Desactivar** a ese usuario; en la ventana privada, abrir otro proyecto | Su sesión se cerró: vuelve a la pantalla de ingreso |
+| 38 | **Activar** y **Restablecer clave** | Muestra una contraseña temporal nueva; con ella puede ingresar y debe cambiarla |
+| 39 | Intentar quitarse a sí mismo el rol de administrador | No se permite |
+
+### 12.11 Seguridad y sesiones
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 40 | 5 contraseñas incorrectas seguidas con el mismo correo | Bloqueo de 15 minutos ("Demasiados intentos") |
+| 41 | **Administración → Bitácora** | Registra ingresos, fallos, bloqueo, creación y cambios de usuarios, con fecha e IP |
+| 42 | Dejar la app sin usar 30 minutos y abrir un proyecto | Pide ingresar de nuevo (sesión vencida) |
+
+### 12.12 Persistencia y mantenimiento
+
+| # | Prueba | Resultado esperado |
+|---|---|---|
+| 43 | `docker compose down` y luego `docker compose up -d` | Los usuarios siguen existiendo; se ingresa con las contraseñas nuevas |
+| 44 | Respaldo: comando de la [sección 13.3](#133-respaldos-y-restauración) | Se genera el archivo `.archive` |
+| 45 | `docker compose run --rm -e ADMIN_EMAIL=otro@empresa.com -e ADMIN_PASSWORD='Temporal2026xx' app create-admin` | "Administrador otro@empresa.com creado"; puede ingresar y debe cambiar la contraseña |
+| 46 | Ver qué guarda la base de datos (sección [15](#15-base-de-datos)) | Solo usuarios, sesiones y bitácora; ningún dato de GitHub |
+
+### 12.13 Al terminar
+
+- Para dejarla encendida: no haga nada (se mantiene funcionando, incluso tras reiniciar el equipo si Docker arranca solo).
+- Para apagarla conservando los datos: `docker compose down`.
+- Para borrar todo lo de prueba y empezar de cero: `docker compose down -v` (**borra usuarios y bitácora**).
+
+---
+
+## 13. Guía de TI: operación y mantenimiento
+
+### 13.1 Tareas periódicas
 
 | Tarea | Frecuencia | Cómo |
 |---|---|---|
@@ -627,12 +877,12 @@ Cambiar `BOOTSTRAP_ADMIN_PASSWORD` en `.env` **no** sirve para esto: solo se usa
 | **Revisar la bitácora y los usuarios** | Mensual | Desde Administración. |
 | **Actualizar el servidor y Docker** | Mensual | Según la política de TI. |
 
-### 12.2 Agregar o quitar organizaciones
+### 13.2 Agregar o quitar organizaciones
 
 - **Agregar:** el dueño de la organización invita a la cuenta del token (organización → **People** → **Invite member**); la cuenta acepta la invitación; si la organización usa SSO, se autoriza el token. Sus Projects aparecen solos en unos 5 minutos. **No hay que tocar el servidor.**
 - **Quitar:** sacar a la cuenta del token de la organización, o pasar a `GITHUB_OWNER_TYPE=org` con la lista explícita de organizaciones en `GITHUB_OWNER`.
 
-### 12.3 Respaldos y restauración
+### 13.3 Respaldos y restauración
 
 Respaldo (genera un archivo con usuarios, sesiones y bitácora):
 ```bash
@@ -651,7 +901,7 @@ docker compose exec -T mongo sh -c 'mongorestore --archive --drop -u "$MONGO_INI
 
 Guardar los respaldos fuera del servidor. Si se pierde la base sin respaldo, solo hay que volver a crear los usuarios: los proyectos siguen en GitHub.
 
-### 12.4 Comandos de operación
+### 13.4 Comandos de operación
 
 | Necesidad | Comando |
 |---|---|
@@ -666,21 +916,21 @@ Guardar los respaldos fuera del servidor. Si se pierde la base sin respaldo, sol
 
 > ⚠️ `docker compose down -v` **borra la base de datos** (usuarios y bitácora). No usarlo salvo que se quiera empezar de cero.
 
-### 12.5 Monitoreo
+### 13.5 Monitoreo
 
 - `GET /healthz` responde `200` si el servidor está funcionando. Sirve para Uptime Kuma, Zabbix, etc.
 - Docker revisa la salud de la aplicación cada 30 segundos (comando interno `healthcheck`) y de MongoDB cada 10 segundos.
 - Los registros (en JSON con Docker) incluyen cada petición (método, ruta, código, tiempo, IP), sin contraseñas ni contenidos. Los errores de GitHub se registran sin el token.
 
-### 12.6 Cambiar la cuenta del token
+### 13.6 Cambiar la cuenta del token
 
 Si cambia la persona o la cuenta de servicio: generar el token con la nueva cuenta (debe ser miembro de las organizaciones), reemplazar `GITHUB_TOKEN`, `docker compose up -d` y `check`. Los usuarios de la aplicación no se ven afectados.
 
 ---
 
-## 13. Guía técnica para desarrolladores
+## 14. Guía técnica para desarrolladores
 
-### 13.1 Tecnologías
+### 14.1 Tecnologías
 
 | Capa | Tecnología |
 |---|---|
@@ -690,7 +940,7 @@ Si cambia la persona o la cuenta de servicio: generar el token con la nueva cuen
 | Integración | API GraphQL de GitHub (ProjectsV2), solo consultas |
 | Despliegue | Docker multi-etapa (imagen distroless, sin shell, usuario no root) + Docker Compose |
 
-### 13.2 Estructura del código
+### 14.2 Estructura del código
 
 ```
 cmd/server/
@@ -716,7 +966,7 @@ deploy/mongo-init.js   Crea el usuario de MongoDB de la aplicación (mínimo pri
 Dockerfile, docker-compose.yml, Makefile, .env.example, SEGURIDAD.md
 ```
 
-### 13.3 Flujo de datos
+### 14.3 Flujo de datos
 
 1. `GET /api/projects` → `CachedProvider.ListProjects` → `Client.Owners` (organizaciones del token en modo `auto`, en caché 5 min) → `Client.ListOwnerProjects` por cada dueño, con la consulta `repositoryOwner(login)` (sirve para organizaciones y usuarios). Si un dueño falla, se registra y se omite; solo hay error si fallan todos.
 2. `GET /api/projects/{id}` → valida el formato del ID y que esté en la lista permitida → `Client.GetProject` (pagina de 100 en 100 hasta 2000 tareas; verifica que el dueño del proyecto esté entre los permitidos) → `mapItem` por tarea → `summarize` calcula el resumen → JSON con `project`, `tasks`, `statusOptions`, `priorityOptions`, `fieldNames`, `fieldRoles`, `summary`, `doneStatuses`.
@@ -728,7 +978,7 @@ Dockerfile, docker-compose.yml, Makefile, .env.example, SEGURIDAD.md
 - Los campos cuyo nombre coincide con `FIELD_*` se copian además a `Status`, `Priority`, `Estimate`, `StartDate`, `DueDate`; los de tipo iteración a `Iteration`. `ProjectDetail.FieldRoles` indica qué campo cumple cada rol, para que el frontend no los repita.
 - El campo interno `Title` se omite (repite el título).
 
-### 13.4 API
+### 14.4 API
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
@@ -753,7 +1003,7 @@ curl -c cookies.txt -H "Content-Type: application/json" \
 curl -b cookies.txt http://localhost:8080/api/projects
 ```
 
-### 13.5 Pruebas
+### 14.5 Pruebas
 
 ```bash
 go vet ./...
@@ -772,7 +1022,7 @@ make test-mongo                                 # capa de datos contra MongoDB r
 
 El build de Docker ejecuta `go test ./...`: si una prueba falla, no se genera la imagen.
 
-### 13.6 Cómo extender
+### 14.6 Cómo extender
 
 | Quiero… | Dónde |
 |---|---|
@@ -784,7 +1034,7 @@ El build de Docker ejecuta `go test ./...`: si una prueba falla, no se genera la
 
 Convenciones: comentarios y mensajes en español; solo biblioteca estándar salvo el driver de MongoDB; el frontend nunca usa `innerHTML` (todo con `textContent` mediante el helper `h()`); toda consulta a GitHub es de lectura.
 
-### 13.7 Desarrollo local rápido
+### 14.7 Desarrollo local rápido
 
 ```bash
 make demo        # modo demo en http://localhost:8080
@@ -796,7 +1046,7 @@ make build       # binario en bin/server
 
 ---
 
-## 14. Base de datos
+## 15. Base de datos
 
 ### Qué guarda
 
@@ -827,7 +1077,7 @@ db.audit_log.find().sort({at: -1}).limit(10)   // últimos eventos
 
 ---
 
-## 15. Seguridad
+## 16. Seguridad
 
 Resumen; el detalle está en [SEGURIDAD.md](SEGURIDAD.md).
 
@@ -843,7 +1093,7 @@ Responsabilidades de operación: usar HTTPS, proteger `.env`, rotar el token, ha
 
 ---
 
-## 16. Límites conocidos y posibles mejoras
+## 17. Límites conocidos y posibles mejoras
 
 ### Límites actuales
 
@@ -873,7 +1123,7 @@ Responsabilidades de operación: usar HTTPS, proteger `.env`, rotar el token, ha
 
 ---
 
-## 17. Solución de problemas
+## 18. Solución de problemas
 
 Primero, siempre: `docker compose run --rm app check` (o `go run ./cmd/server check`). Indica la causa de la mayoría de los problemas.
 
@@ -901,6 +1151,7 @@ Primero, siempre: `docker compose run --rm app check` (o `go run ./cmd/server ch
 | Tareas "(Elemento sin acceso)" | Repositorio privado sin acceso: agregar `repo` al token o dar acceso a la cuenta. |
 | Estado, prioridad o fechas vacíos | El campo tiene otro nombre: ajustar `FIELD_*` (`check` muestra los nombres reales). |
 | Un estado final cuenta como abierto o vencido | Agregarlo a `DONE_STATUSES`. |
+| En la noche, tareas que vencen hoy salen como vencidas | Falta `TZ` en `.env` (el contenedor usa UTC). Poner `TZ=America/Bogota` (o la zona que corresponda) y `docker compose up -d`. |
 | "GitHub limitó temporalmente las consultas" | Límite de la API o permisos. Esperar unos minutos; revisar el token. |
 | Un cambio en GitHub no se ve | Esperar 2 minutos o pulsar "Actualizar desde GitHub". |
 
@@ -916,7 +1167,7 @@ Primero, siempre: `docker compose run --rm app check` (o `go run ./cmd/server ch
 
 ---
 
-## 18. Glosario
+## 19. Glosario
 
 | Término | Significado |
 |---|---|
@@ -935,7 +1186,7 @@ Primero, siempre: `docker compose run --rm app check` (o `go run ./cmd/server ch
 
 ---
 
-## 19. Referencia rápida de comandos
+## 20. Referencia rápida de comandos
 
 ```bash
 # Producción (Docker)

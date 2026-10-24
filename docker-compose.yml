@@ -30,6 +30,7 @@ services:
         condition: service_healthy
     # Solo se pasan las variables que la app necesita (no recibe la clave root de Mongo).
     environment:
+      TZ: ${TZ:-UTC}
       GITHUB_MODE: ${GITHUB_MODE:-api}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_OWNER: ${GITHUB_OWNER:-}
