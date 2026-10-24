@@ -338,7 +338,17 @@ En Linux, MongoDB se instala según https://www.mongodb.com/docs/manual/administ
 
 ### Opción C: Docker en el equipo
 
-Igual que en producción ([sección 6](#6-instalación-en-un-servidor-producción)) con Docker Desktop, usando `APP_PUBLISH=127.0.0.1:8080` y `COOKIE_SECURE=false`. Abrir http://localhost:8080.
+Igual que en producción ([sección 6](#6-instalación-en-un-servidor-producción)), usando `APP_PUBLISH=127.0.0.1:8080` y `COOKIE_SECURE=false`. Abrir http://localhost:8080.
+
+Para tener Docker en el equipo:
+- **Docker Desktop** (Windows, Mac, Linux): https://www.docker.com/products/docker-desktop/
+- **En Mac, alternativa sin interfaz gráfica: Colima** (gratis, mismos comandos `docker compose`):
+  ```bash
+  brew install colima docker docker-compose
+  mkdir -p ~/.docker/cli-plugins
+  ln -sfn /opt/homebrew/opt/docker-compose/bin/docker-compose ~/.docker/cli-plugins/docker-compose
+  colima start --cpu 2 --memory 4     # encender Docker (colima stop para apagarlo)
+  ```
 
 ---
 

@@ -160,7 +160,7 @@ func check() int {
 
 	fmt.Println()
 	if ok {
-		fmt.Println("Todo listo. Inicie la aplicación con: go run ./cmd/server")
+		fmt.Println("Todo listo. Inicie la aplicación con: go run ./cmd/server  (o con Docker: docker compose up -d)")
 		return 0
 	}
 	fmt.Println("Hay problemas que corregir (ver ❌ arriba).")
