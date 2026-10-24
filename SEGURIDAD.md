@@ -8,8 +8,8 @@ Resumen de los controles de seguridad de la aplicación, agrupados por riesgo. S
 |---|---|
 | El token se lee de variables de entorno; nunca está en el código ni en Git (`.env` está en `.gitignore` y `.dockerignore`). | `internal/config` |
 | El token **nunca se envía al navegador**: el frontend solo habla con el backend propio. | Arquitectura |
-| Integración **solo lectura**: el cliente solo contiene consultas GraphQL (no hay mutaciones; una prueba lo verifica). Se recomienda token fine-grained con permisos *Read-only*. | `internal/github/client.go`, README |
-| Solo se muestran proyectos del dueño configurado: se valida el `owner` de cada proyecto y que el ID esté en la lista permitida. | `client.go`, `handlers_projects.go` |
+| Integración **solo lectura**: el cliente solo contiene consultas GraphQL (no hay mutaciones; una prueba lo verifica). Token clásico con permisos de lectura (`read:project`, `read:org`, `repo`), idealmente de una cuenta de servicio. | `internal/github/client.go`, README |
+| Solo se muestran proyectos de los dueños permitidos (las organizaciones de la cuenta del token en modo `auto`, o la lista de `GITHUB_OWNER`): se valida el `owner` de cada proyecto y que el ID esté en la lista permitida. Si una organización falla, se omite sin exponer las demás. | `client.go`, `handlers_projects.go` |
 | Los errores de GitHub se registran sin cuerpo de respuesta ni cabeceras (no se filtra el token a los logs). | `client.go` |
 | Límite de tamaño de respuesta (20 MB) y de elementos (2000) para evitar abuso de memoria. | `client.go` |
 
@@ -61,13 +61,13 @@ Otras cabeceras: `X-Content-Type-Options: nosniff`, `Permissions-Policy`, `Cross
 
 - **Bitácora de auditoría**: ingresos, fallos, bloqueos, salidas, cambios de contraseña y gestión de usuarios (con IP y resultado). Se conserva 180 días (TTL).
 - Logs de acceso sin cuerpos, contraseñas ni query strings.
-- **Minimización de datos**: no se copia la información de GitHub a la base de datos (solo caché en memoria por minutos) ni se consulta el cuerpo/descripción de los issues; se muestran únicamente los campos necesarios para el seguimiento.
+- **Minimización de datos**: no se copia la información de GitHub a la base de datos (solo caché en memoria por minutos). Se muestran la descripción y los campos de las tareas de los Projects, que son la información de seguimiento; no se leen código, comentarios ni otros contenidos de los repositorios.
 
 ## 7. Responsabilidades operativas (fuera del código)
 
 1. Usar **HTTPS** en producción y `COOKIE_SECURE=true`.
 2. Guardar `.env` con permisos restringidos; cambiar todas las contraseñas de ejemplo.
-3. Token de GitHub fine-grained, solo lectura, con expiración, idealmente de una cuenta de servicio; rotarlo periódicamente.
+3. Token de GitHub de solo lectura, con expiración, idealmente de una cuenta de servicio; rotarlo periódicamente.
 4. Respaldos de MongoDB y revisión periódica de la bitácora y de usuarios inactivos.
 5. Mantener Go y las dependencias actualizadas (`go list -m -u all`, `govulncheck ./...`).
 6. Informar a los usuarios qué datos se muestran y para qué fin (seguimiento de proyectos, no evaluación individual automatizada).
